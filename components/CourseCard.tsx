@@ -88,7 +88,7 @@ export default function CourseCard({ course, onEdit, onDelete }: CourseCardProps
       <div className="mb-3">
         <div className="flex items-center justify-between text-sm text-gray-600 mb-2">
           <span>Progress</span>
-          <span className="font-medium">{course.tasksCompleted}/{course.totalTasks} tasks</span>
+          <span className="font-medium">{course.progress}%</span>
         </div>
         <div className="w-full bg-gray-200 rounded-full h-2">
           <div

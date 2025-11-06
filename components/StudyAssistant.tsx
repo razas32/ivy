@@ -4,6 +4,7 @@ import { useState } from 'react';
 import MessageBubble from './MessageBubble';
 import FlashcardView from './FlashcardView';
 import QuizView from './QuizView';
+import TypingIndicator from './TypingIndicator';
 import { CourseExtractionResult } from '@/types';
 
 interface StudyAssistantProps {
@@ -24,6 +25,7 @@ export default function StudyAssistant({ onStructuredData }: StudyAssistantProps
   const [message, setMessage] = useState('');
   const [file, setFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [isThinking, setIsThinking] = useState(false);
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
@@ -74,6 +76,7 @@ export default function StudyAssistant({ onStructuredData }: StudyAssistantProps
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isThinking) return;
     if (!message.trim() && !file) return;
 
     // Add user message
@@ -91,6 +94,7 @@ export default function StudyAssistant({ onStructuredData }: StudyAssistantProps
     const currentFile = file;
     setMessage('');
     setFile(null);
+    setIsThinking(true);
 
     try {
       // Read file content if present
@@ -145,6 +149,8 @@ export default function StudyAssistant({ onStructuredData }: StudyAssistantProps
         content: `I apologize, but I encountered an error: ${error instanceof Error ? error.message : 'Please try again.'}`,
       };
       setMessages(prev => [...prev, errorMessage]);
+    } finally {
+      setIsThinking(false);
     }
   };
 
@@ -274,6 +280,7 @@ export default function StudyAssistant({ onStructuredData }: StudyAssistantProps
                   file={msg.file}
                 />
               ))}
+              {isThinking && <TypingIndicator />}
             </div>
           )}
 
@@ -358,7 +365,7 @@ export default function StudyAssistant({ onStructuredData }: StudyAssistantProps
 
               <button
                 type="submit"
-                disabled={!message.trim() && !file}
+                disabled={(!message.trim() && !file) || isThinking}
                 className="absolute right-2 bottom-2 p-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

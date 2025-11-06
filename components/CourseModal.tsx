@@ -11,13 +11,22 @@ interface CourseModalProps {
   mode: 'create' | 'edit';
 }
 
-const courseColors: { value: CourseColor; label: string; class: string }[] = [
-  { value: 'blue', label: 'Blue', class: 'bg-course-blue' },
-  { value: 'purple', label: 'Purple', class: 'bg-course-purple' },
-  { value: 'green', label: 'Green', class: 'bg-course-green' },
-  { value: 'orange', label: 'Orange', class: 'bg-course-orange' },
-  { value: 'red', label: 'Red', class: 'bg-course-red' },
-  { value: 'pink', label: 'Pink', class: 'bg-course-pink' },
+const courseColorValues: Record<CourseColor, string> = {
+  blue: '#3b82f6',
+  purple: '#a855f7',
+  green: '#10b981',
+  orange: '#f97316',
+  red: '#ef4444',
+  pink: '#ec4899',
+};
+
+const courseColors: { value: CourseColor; label: string }[] = [
+  { value: 'blue', label: 'Blue' },
+  { value: 'purple', label: 'Purple' },
+  { value: 'green', label: 'Green' },
+  { value: 'orange', label: 'Orange' },
+  { value: 'red', label: 'Red' },
+  { value: 'pink', label: 'Pink' },
 ];
 
 export default function CourseModal({ isOpen, onClose, onSave, course, mode }: CourseModalProps) {
@@ -25,7 +34,6 @@ export default function CourseModal({ isOpen, onClose, onSave, course, mode }: C
     code: '',
     name: '',
     color: 'blue' as CourseColor,
-    totalTasks: 1,
     dueDate: '',
   });
 
@@ -35,7 +43,6 @@ export default function CourseModal({ isOpen, onClose, onSave, course, mode }: C
         code: course.code,
         name: course.name,
         color: course.color,
-        totalTasks: course.totalTasks,
         dueDate: course.dueDate,
       });
     } else {
@@ -43,7 +50,6 @@ export default function CourseModal({ isOpen, onClose, onSave, course, mode }: C
         code: '',
         name: '',
         color: 'blue',
-        totalTasks: 1,
         dueDate: '',
       });
     }
@@ -52,18 +58,27 @@ export default function CourseModal({ isOpen, onClose, onSave, course, mode }: C
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
+    const basePayload = {
+      code: formData.code,
+      name: formData.name,
+      color: formData.color,
+      dueDate: formData.dueDate,
+    };
+
     if (mode === 'create') {
       onSave({
-        ...formData,
+        ...basePayload,
         progress: 0,
         tasksCompleted: 0,
+        totalTasks: 0,
       });
     } else {
       onSave({
         id: course?.id,
-        ...formData,
-        progress: course?.progress || 0,
-        tasksCompleted: course?.tasksCompleted || 0,
+        ...basePayload,
+        progress: course?.progress ?? 0,
+        tasksCompleted: course?.tasksCompleted ?? 0,
+        totalTasks: course?.totalTasks ?? 0,
       });
     }
 
@@ -73,8 +88,11 @@ export default function CourseModal({ isOpen, onClose, onSave, course, mode }: C
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-2xl max-w-md w-full">
+    <div
+      className="fixed inset-0 flex items-center justify-center z-50 p-4 transition-opacity"
+      style={{ backgroundColor: 'rgba(17, 24, 39, 0.12)' }}
+    >
+      <div className="bg-white rounded-xl shadow-2xl max-w-md w-full modal-animate-in">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200">
           <h2 className="text-xl font-semibold text-gray-900">
@@ -133,30 +151,23 @@ export default function CourseModal({ isOpen, onClose, onSave, course, mode }: C
                   key={colorOption.value}
                   type="button"
                   onClick={() => setFormData({ ...formData, color: colorOption.value })}
-                  className={`${colorOption.class} h-10 rounded-lg transition-all ${
+                  className={`h-10 w-full rounded-lg transition-all ${
                     formData.color === colorOption.value
                       ? 'ring-2 ring-offset-2 ring-gray-900'
                       : 'hover:scale-110'
                   }`}
+                  style={{
+                    backgroundColor: courseColorValues[colorOption.value],
+                    boxShadow:
+                      formData.color === colorOption.value
+                        ? `0 0 0 1px rgba(17,24,39,0.15)`
+                        : 'none',
+                  }}
+                  aria-pressed={formData.color === colorOption.value}
                   title={colorOption.label}
                 />
               ))}
             </div>
-          </div>
-
-          {/* Total Tasks */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Total Tasks
-            </label>
-            <input
-              type="number"
-              value={formData.totalTasks}
-              onChange={(e) => setFormData({ ...formData, totalTasks: parseInt(e.target.value) || 1 })}
-              className="input"
-              min="1"
-              required
-            />
           </div>
 
           {/* Due Date */}
