@@ -71,9 +71,9 @@ export default function Sidebar({ courses }: SidebarProps) {
                 href={`/courses/${course.id}`}
                 className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-gray-700 hover:bg-gray-100 transition-colors"
               >
-                <div className={`w-2 h-2 rounded-full ${getCourseColorClass(course.color)}`} />
-                <div className="flex-1 text-left">
-                  <p className="text-sm font-medium">{course.code}</p>
+                <div className={`w-2 h-2 rounded-full flex-shrink-0 ${getCourseColorClass(course.color)}`} />
+                <div className="flex-1 min-w-0 text-left">
+                  <p className="text-sm font-medium truncate">{course.code}</p>
                   <p className="text-xs text-gray-500 truncate">{course.name}</p>
                 </div>
               </Link>
@@ -86,12 +86,15 @@ export default function Sidebar({ courses }: SidebarProps) {
           <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider px-3 mb-2">
             Career Prep
           </h3>
-          <button className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-gray-700 hover:bg-gray-100 transition-colors">
+          <Link
+            href="/resume-analyzer"
+            className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-gray-700 hover:bg-gray-100 transition-colors"
+          >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
             </svg>
             <span className="text-sm font-medium">Resume Analyzer</span>
-          </button>
+          </Link>
         </div>
       </nav>
 

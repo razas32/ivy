@@ -43,13 +43,24 @@ export default function StudyAssistant({ onStructuredData }: StudyAssistantProps
   const handleDragEnter = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    setIsDragging(true);
+    // Only set dragging if we're entering from outside the component
+    if (e.currentTarget === e.target || !isDragging) {
+      setIsDragging(true);
+    }
   };
 
   const handleDragLeave = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    setIsDragging(false);
+    // Only unset dragging if we're leaving the component entirely
+    // Check if the related target is outside the current target
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX;
+    const y = e.clientY;
+
+    if (x <= rect.left || x >= rect.right || y <= rect.top || y >= rect.bottom) {
+      setIsDragging(false);
+    }
   };
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -223,14 +234,33 @@ export default function StudyAssistant({ onStructuredData }: StudyAssistantProps
   return (
     <div className="mt-12 mb-24">
       {/* Main Card */}
-      <div className="card overflow-hidden">
+      <div
+        className="card overflow-hidden relative"
+        onDragEnter={handleDragEnter}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+      >
+        {/* Drag Overlay - Covers entire card */}
+        {isDragging && (
+          <div className="absolute inset-0 bg-primary-50 bg-opacity-95 border-4 border-dashed border-primary-500 rounded-2xl flex items-center justify-center z-50 pointer-events-none">
+            <div className="text-center">
+              <svg className="w-16 h-16 text-primary-600 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+              </svg>
+              <p className="text-xl font-semibold text-primary-700">Drop your file here</p>
+              <p className="text-sm text-primary-600 mt-2">PDF, DOC, DOCX, TXT, JPG, PNG</p>
+            </div>
+          </div>
+        )}
+
         {/* Header */}
         <div className="border-b border-gray-200 p-6">
           <div className="flex items-center gap-2 mb-4">
-            <svg className="w-6 h-6 text-gray-900" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-6 h-6 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" />
             </svg>
-            <h2 className="text-xl font-bold text-gray-900">AI Study Assistant</h2>
+            <h2 className="text-xl font-bold text-primary-600">AI Study Assistant</h2>
           </div>
 
           {/* Tabs */}
@@ -291,25 +321,8 @@ export default function StudyAssistant({ onStructuredData }: StudyAssistantProps
         {/* Input Area - Always Visible */}
         <form
           onSubmit={handleSubmit}
-          className="relative border-t border-gray-200 bg-white p-6"
-          onDragEnter={handleDragEnter}
-          onDragOver={handleDragOver}
-          onDragLeave={handleDragLeave}
-          onDrop={handleDrop}
+          className="border-t border-gray-200 bg-white p-6"
         >
-          {/* Drag Overlay */}
-          {isDragging && (
-            <div className="absolute inset-0 bg-primary-50 bg-opacity-90 border-4 border-dashed border-primary-500 rounded-2xl flex items-center justify-center z-50 pointer-events-none">
-              <div className="text-center">
-                <svg className="w-16 h-16 text-primary-600 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                </svg>
-                <p className="text-xl font-semibold text-primary-700">Drop your file here</p>
-                <p className="text-sm text-primary-600 mt-2">PDF, DOC, DOCX, TXT, JPG, PNG</p>
-              </div>
-            </div>
-          )}
-
           {/* File Upload Preview */}
           {file && (
             <div className="mb-3 flex items-center gap-2 bg-gray-100 px-3 py-2 rounded-lg w-fit">
