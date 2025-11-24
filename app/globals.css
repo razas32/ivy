@@ -56,6 +56,10 @@ h1, h2, h3, h4, h5, h6 {
   background-color: #d1d5db;
 }
 
+.bg-ivy-gradient {
+  background-image: linear-gradient(120deg, #004d30 0%, #008050 50%, #00a36f 100%);
+}
+
 .input {
   width: 100%;
   padding: 0.5rem 1rem;

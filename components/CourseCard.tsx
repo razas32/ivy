@@ -1,15 +1,17 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { Course } from '@/types';
+import { Course, Deadline } from '@/types';
+import { getNextDeadline, formatDeadlineDisplay, isDeadlineOverdue, isDeadlineUrgent } from '@/lib/deadlineUtils';
 
 interface CourseCardProps {
   course: Course;
+  deadlines: Deadline[];
   onEdit: (course: Course) => void;
   onDelete: (id: string) => void;
 }
 
-export default function CourseCard({ course, onEdit, onDelete }: CourseCardProps) {
+export default function CourseCard({ course, deadlines, onEdit, onDelete }: CourseCardProps) {
   const router = useRouter();
 
   const getCourseColorClass = (color: string) => {
@@ -36,6 +38,36 @@ export default function CourseCard({ course, onEdit, onDelete }: CourseCardProps
     return colorMap[color] || 'text-gray-500';
   };
 
+  const getCourseGradientClass = (color: string) => {
+    const gradientMap: Record<string, string> = {
+      blue: 'bg-gradient-to-br from-blue-500 to-blue-700',
+      purple: 'bg-gradient-to-br from-purple-500 to-purple-700',
+      green: 'bg-gradient-to-br from-emerald-500 to-emerald-700',
+      orange: 'bg-gradient-to-br from-orange-500 to-orange-700',
+      red: 'bg-gradient-to-br from-red-500 to-red-700',
+      pink: 'bg-gradient-to-br from-pink-500 to-pink-700',
+    };
+    return gradientMap[color] || 'bg-gradient-to-br from-gray-400 to-gray-600';
+  };
+
+  const getCourseFillClass = (color: string) => {
+    const map: Record<string, string> = {
+      blue: 'bg-course-blue',
+      purple: 'bg-course-purple',
+      green: 'bg-course-green',
+      orange: 'bg-course-orange',
+      red: 'bg-course-red',
+      pink: 'bg-course-pink',
+    };
+    return map[color] || 'bg-gray-500';
+  };
+
+  // Get deadline information for this course
+  const courseDeadlines = deadlines.filter(d => d.courseId === course.id);
+  const nextDeadline = getNextDeadline(courseDeadlines);
+  const deadlineText = formatDeadlineDisplay(nextDeadline);
+  const isOverdue = isDeadlineOverdue(deadlineText);
+  const isUrgent = isDeadlineUrgent(deadlineText);
   const isCompleted = course.progress === 100;
 
   return (
@@ -45,8 +77,8 @@ export default function CourseCard({ course, onEdit, onDelete }: CourseCardProps
     >
       {/* Course Header */}
       <div className="flex items-start gap-4 mb-4">
-        <div className={`${getCourseColorClass(course.color)} bg-opacity-10 border-2 rounded-xl p-3 flex items-center justify-center`}>
-          <span className={`text-lg font-bold ${getTextColorClass(course.color)}`}>
+        <div className={`${getCourseGradientClass(course.color)} text-white rounded-xl p-3 flex items-center justify-center shadow-inner`}>
+          <span className="text-lg font-bold tracking-wide">
             {course.code.substring(0, 3)}
           </span>
         </div>
@@ -92,7 +124,7 @@ export default function CourseCard({ course, onEdit, onDelete }: CourseCardProps
         </div>
         <div className="w-full bg-gray-200 rounded-full h-2">
           <div
-            className={`h-2 rounded-full transition-all ${getCourseColorClass(course.color).split(' ')[0]}`}
+            className={`h-2 rounded-full transition-all ${getCourseFillClass(course.color)}`}
             style={{ width: `${course.progress}%` }}
           />
         </div>
@@ -109,10 +141,17 @@ export default function CourseCard({ course, onEdit, onDelete }: CourseCardProps
           </>
         ) : (
           <>
-            <svg className="w-4 h-4 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg
+              className={`w-4 h-4 ${isOverdue ? 'text-red-500' : isUrgent ? 'text-orange-500' : 'text-gray-400'}`}
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
-            <span className="text-sm text-gray-600">Due {course.dueDate}</span>
+            <span className={`text-sm font-medium ${isOverdue ? 'text-red-600' : isUrgent ? 'text-orange-600' : 'text-gray-600'}`}>
+              {deadlineText}
+            </span>
           </>
         )}
       </div>

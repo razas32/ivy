@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import IvyGradient from './IvyGradient';
 import { Course, CourseColor } from '@/types';
 
 interface CourseModalProps {
@@ -92,21 +93,21 @@ export default function CourseModal({ isOpen, onClose, onSave, course, mode }: C
       className="fixed inset-0 flex items-center justify-center z-50 p-4 transition-opacity"
       style={{ backgroundColor: 'rgba(17, 24, 39, 0.12)' }}
     >
-      <div className="bg-white rounded-xl shadow-2xl max-w-md w-full modal-animate-in">
+      <div className="bg-white rounded-xl shadow-2xl max-w-md w-full modal-animate-in overflow-hidden">
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200">
-          <h2 className="text-xl font-semibold text-gray-900">
+        <IvyGradient className="flex items-center justify-between p-6 text-white rounded-t-xl border-b border-white/10">
+          <h2 className="text-xl font-semibold">
             {mode === 'create' ? 'Add New Course' : 'Edit Course'}
           </h2>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 transition-colors"
+            className="text-white/80 hover:text-white transition-colors"
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
-        </div>
+        </IvyGradient>
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
@@ -196,7 +197,7 @@ export default function CourseModal({ isOpen, onClose, onSave, course, mode }: C
             </button>
             <button
               type="submit"
-              className="flex-1 btn btn-primary"
+              className="flex-1 px-4 py-3 rounded-lg text-white font-semibold shadow-md bg-ivy-gradient hover:opacity-95 transition"
             >
               {mode === 'create' ? 'Add Course' : 'Save Changes'}
             </button>

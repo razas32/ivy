@@ -92,6 +92,7 @@ export default function Dashboard() {
     setCourses(prevCourses =>
       prevCourses.map(course => {
         const courseTasks = tasks.filter(task => task.courseId === course.id);
+
         const completed = courseTasks.filter(task => task.completed).length;
         const total = courseTasks.length;
         const progress = total === 0 ? 0 : Math.round((completed / total) * 100);
@@ -315,6 +316,7 @@ export default function Dashboard() {
                   <CourseCard
                     key={course.id}
                     course={course}
+                    deadlines={deadlines}
                     onEdit={handleEditCourse}
                     onDelete={handleDeleteCourse}
                   />

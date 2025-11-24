@@ -43,7 +43,6 @@ export default function StudyAssistant({ onStructuredData }: StudyAssistantProps
   const handleDragEnter = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    // Only set dragging if we're entering from outside the component
     if (e.currentTarget === e.target || !isDragging) {
       setIsDragging(true);
     }
@@ -52,8 +51,6 @@ export default function StudyAssistant({ onStructuredData }: StudyAssistantProps
   const handleDragLeave = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    // Only unset dragging if we're leaving the component entirely
-    // Check if the related target is outside the current target
     const rect = e.currentTarget.getBoundingClientRect();
     const x = e.clientX;
     const y = e.clientY;
@@ -90,7 +87,6 @@ export default function StudyAssistant({ onStructuredData }: StudyAssistantProps
     if (isThinking) return;
     if (!message.trim() && !file) return;
 
-    // Add user message
     const userMessage: Message = {
       id: Date.now().toString(),
       role: 'user',
@@ -101,22 +97,17 @@ export default function StudyAssistant({ onStructuredData }: StudyAssistantProps
     const newMessages = [...messages, userMessage];
     setMessages(newMessages);
 
-    // Reset form immediately
     const currentFile = file;
     setMessage('');
     setFile(null);
     setIsThinking(true);
 
     try {
-      // Read file content if present
       let fileContent = '';
       if (currentFile) {
-        console.log('Reading file:', currentFile.name, currentFile.type);
         fileContent = await readFileContent(currentFile);
-        console.log('File content length:', fileContent.length);
       }
 
-      // Call API
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: {
@@ -140,7 +131,6 @@ export default function StudyAssistant({ onStructuredData }: StudyAssistantProps
         structuredData?: CourseExtractionResult;
       };
 
-      // Add AI response
       const aiMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
@@ -166,12 +156,10 @@ export default function StudyAssistant({ onStructuredData }: StudyAssistantProps
   };
 
   const readFileContent = async (file: File): Promise<string> => {
-    // Check if file is a PDF
     if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
       return await readPDFContent(file);
     }
 
-    // For non-PDF files, read as text
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = (e) => {
@@ -191,7 +179,6 @@ export default function StudyAssistant({ onStructuredData }: StudyAssistantProps
 
       let fullText = '';
 
-      // Extract text from each page
       for (let i = 1; i <= pdf.numPages; i++) {
         const page = await pdf.getPage(i);
         const textContent = await page.getTextContent();
@@ -233,7 +220,6 @@ export default function StudyAssistant({ onStructuredData }: StudyAssistantProps
 
   return (
     <div className="mt-12 mb-24">
-      {/* Main Card */}
       <div
         className="card overflow-hidden relative"
         onDragEnter={handleDragEnter}
@@ -241,7 +227,6 @@ export default function StudyAssistant({ onStructuredData }: StudyAssistantProps
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
       >
-        {/* Drag Overlay - Covers entire card */}
         {isDragging && (
           <div className="absolute inset-0 bg-primary-50 bg-opacity-95 border-4 border-dashed border-primary-500 rounded-2xl flex items-center justify-center z-50 pointer-events-none">
             <div className="text-center">
@@ -254,7 +239,6 @@ export default function StudyAssistant({ onStructuredData }: StudyAssistantProps
           </div>
         )}
 
-        {/* Header */}
         <div className="border-b border-gray-200 p-6">
           <div className="flex items-center gap-2 mb-4">
             <svg className="w-6 h-6 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -263,7 +247,6 @@ export default function StudyAssistant({ onStructuredData }: StudyAssistantProps
             <h2 className="text-xl font-bold text-primary-600">AI Study Assistant</h2>
           </div>
 
-          {/* Tabs */}
           <div className="flex gap-2">
             <button
               onClick={() => setActiveTab('chat')}
@@ -298,7 +281,6 @@ export default function StudyAssistant({ onStructuredData }: StudyAssistantProps
           </div>
         </div>
 
-        {/* Content Area */}
         <div className="h-[500px] overflow-y-auto bg-gray-50">
           {activeTab === 'chat' && (
             <div className="p-6">
@@ -318,12 +300,10 @@ export default function StudyAssistant({ onStructuredData }: StudyAssistantProps
           {activeTab === 'quizzes' && <QuizView />}
         </div>
 
-        {/* Input Area - Always Visible */}
         <form
           onSubmit={handleSubmit}
           className="border-t border-gray-200 bg-white p-6"
         >
-          {/* File Upload Preview */}
           {file && (
             <div className="mb-3 flex items-center gap-2 bg-gray-100 px-3 py-2 rounded-lg w-fit">
               <svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -342,9 +322,7 @@ export default function StudyAssistant({ onStructuredData }: StudyAssistantProps
             </div>
           )}
 
-          {/* Input Row */}
           <div className="flex items-start gap-2">
-            {/* Attachment Button */}
             <input
               type="file"
               id="chat-file-upload"
@@ -388,7 +366,6 @@ export default function StudyAssistant({ onStructuredData }: StudyAssistantProps
             </div>
           </div>
 
-          {/* Quick Actions */}
           <div className="flex gap-2 mt-4">
             {quickActions.map((action, index) => (
               <button
