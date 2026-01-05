@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
-import { CourseExtractionResult } from '@/types';
+import { CourseExtractionResult, Flashcard, QuizQuestion } from '@/types';
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -9,6 +9,8 @@ const openai = new OpenAI({
 const SYSTEM_PROMPT = `You are Ivy, an AI study assistant. Extract course structure, deadlines, and tasks from the provided conversation context and document text.
 
 Respond ONLY with JSON that matches the provided schema exactly. Populate every field you can from the source material, leave arrays empty when no data is available, and set a field to null rather than inventing details when the document does not state them. Estimate reasonable priorities for deadlines/tasks (low, medium, high) when not stated.`;
+
+const GENERAL_PROMPT = `You are Ivy, an AI study assistant. Answer succinctly and helpfully. You can summarize material, tutor on concepts, draft study plans, or answer career questions. Prefer plain text without markdown unless formatting improves clarity.`;
 
 const COURSE_EXTRACTION_SCHEMA = {
   name: 'course_extraction',
@@ -122,15 +124,85 @@ const COURSE_EXTRACTION_SCHEMA = {
   strict: true,
 } as const;
 
+const FLASHCARD_PROMPT = `You are Ivy, an AI study assistant. Given lecture or study material, extract concise flashcards.
+
+- Front: short prompt/question.
+- Back: concise answer with key details.
+- Avoid markdown, bullets, and citations. Keep each side under 240 characters.`;
+
+const FLASHCARD_SCHEMA = {
+  name: 'flashcard_generation',
+  schema: {
+    type: 'object',
+    additionalProperties: false,
+    required: ['flashcards'],
+    properties: {
+      flashcards: {
+        type: 'array',
+        items: {
+          type: 'object',
+          additionalProperties: false,
+          required: ['front', 'back'],
+          properties: {
+            front: { type: 'string' },
+            back: { type: 'string' },
+          },
+        },
+        default: [],
+      },
+    },
+  },
+  strict: true,
+} as const;
+
+const QUIZ_PROMPT = `You are Ivy, an AI study assistant. Generate a short quiz that helps a student self-test.
+
+- Include a mix of multiple-choice and true/false or fill-in questions.
+- Keep answers concise; for multiple choice, supply options and the correct answer text.
+- Avoid markdown and citations.`;
+
+const QUIZ_SCHEMA = {
+  name: 'quiz_generation',
+  schema: {
+    type: 'object',
+    additionalProperties: false,
+    required: ['questions'],
+    properties: {
+      questions: {
+        type: 'array',
+        items: {
+          type: 'object',
+          additionalProperties: false,
+          required: ['id', 'prompt', 'type', 'options', 'answer'],
+          properties: {
+            id: { type: 'string' },
+            prompt: { type: 'string' },
+            type: { type: 'string', enum: ['mcq', 'truefalse', 'fill'] },
+            options: {
+              type: 'array',
+              items: { type: 'string' },
+              default: [],
+            },
+            answer: { type: 'string' },
+          },
+        },
+        default: [],
+      },
+    },
+  },
+  strict: true,
+} as const;
+
 export async function POST(req: NextRequest) {
   try {
-    const { messages, fileContent } = await req.json();
+    const { messages, fileContent, generationType } = await req.json();
+    const mode: 'chat' | 'course' | 'flashcards' | 'quiz' = generationType || 'chat';
 
-    console.log('Received request:', { messagesCount: messages?.length, hasFileContent: !!fileContent });
+    console.log('Received request:', { messagesCount: messages?.length, hasFileContent: !!fileContent, mode });
 
     // Prepare messages for OpenAI
     const openaiMessages: any[] = [
-      { role: 'system', content: SYSTEM_PROMPT },
+      { role: 'system', content: getSystemPrompt(mode) },
     ];
 
     // Add conversation history
@@ -155,38 +227,57 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    console.log('Calling OpenAI API with', openaiMessages.length, 'messages');
+    console.log('Calling OpenAI API with', openaiMessages.length, 'messages for mode', mode);
 
-    // Call OpenAI API with JSON schema response
+    const responseFormat = getResponseFormat(mode);
+
+    // Call OpenAI API with JSON schema response when needed
     const completion = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
       messages: openaiMessages,
       temperature: 0.2,
       max_tokens: 4000,
-      response_format: {
-        type: 'json_schema',
-        json_schema: COURSE_EXTRACTION_SCHEMA,
-      },
+      ...(responseFormat ? { response_format: responseFormat } : {}),
     });
 
     console.log('OpenAI API response received');
 
     const rawContent = completion.choices[0].message.content;
     let structuredData: CourseExtractionResult | null = null;
+    let flashcards: Flashcard[] | undefined;
+    let quizQuestions: QuizQuestion[] | undefined;
 
-    if (rawContent) {
+    if (rawContent && responseFormat) {
       try {
-        structuredData = JSON.parse(rawContent) as CourseExtractionResult;
+        const parsed = JSON.parse(rawContent);
+        if (mode === 'flashcards') {
+          flashcards = normalizeFlashcards(parsed?.flashcards || []);
+        } else if (mode === 'quiz') {
+          quizQuestions = normalizeQuizQuestions(parsed?.questions || []);
+        } else if (mode === 'course') {
+          structuredData = parsed as CourseExtractionResult;
+        } else {
+          // chat mode returns plain text; no parsing
+        }
       } catch (parseError) {
         console.error('Failed to parse JSON response from OpenAI', parseError);
       }
     }
 
-    const assistantMessage = formatAssistantMessage(structuredData);
+    const assistantMessage =
+      mode === 'flashcards'
+        ? formatFlashcardMessage(flashcards)
+        : mode === 'quiz'
+        ? formatQuizMessage(quizQuestions)
+        : mode === 'course'
+        ? formatAssistantMessage(structuredData)
+        : rawContent || 'How else can I help?';
 
     return NextResponse.json({
       message: assistantMessage,
       structuredData,
+      flashcards,
+      quizQuestions,
     });
   } catch (error: any) {
     console.error('OpenAI API error details:', {
@@ -256,4 +347,76 @@ function formatAssistantMessage(data: CourseExtractionResult | null) {
     : '';
 
   return `Here’s what I found:\n\n${courseSummaries}${summaryPart}${actionsPart}`;
+}
+
+function getSystemPrompt(mode: 'chat' | 'course' | 'flashcards' | 'quiz') {
+  if (mode === 'flashcards') return FLASHCARD_PROMPT;
+  if (mode === 'quiz') return QUIZ_PROMPT;
+  if (mode === 'course') return SYSTEM_PROMPT;
+  return GENERAL_PROMPT;
+}
+
+function getResponseFormat(mode: 'chat' | 'course' | 'flashcards' | 'quiz'): OpenAI.Chat.Completions.ChatCompletionCreateParams['response_format'] {
+  if (mode === 'flashcards') {
+    return { type: 'json_schema', json_schema: FLASHCARD_SCHEMA } as const;
+  }
+
+  if (mode === 'quiz') {
+    return { type: 'json_schema', json_schema: QUIZ_SCHEMA } as const;
+  }
+
+  if (mode === 'course') {
+    return { type: 'json_schema', json_schema: COURSE_EXTRACTION_SCHEMA } as const;
+  }
+
+  return undefined;
+}
+
+function normalizeFlashcards(raw: any[]): Flashcard[] {
+  if (!Array.isArray(raw)) return [];
+  const seen = new Set<string>();
+  const cards: Flashcard[] = [];
+
+  raw.forEach((card, index) => {
+    if (!card?.front || !card?.back) return;
+    const front = String(card.front).trim();
+    const back = String(card.back).trim();
+    const key = `${front.toLowerCase()}|${back.toLowerCase()}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    cards.push({
+      id: card.id || crypto.randomUUID?.() || `card-${Date.now()}-${index}`,
+      front,
+      back,
+    });
+  });
+
+  return cards;
+}
+
+function normalizeQuizQuestions(raw: any[]): QuizQuestion[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .filter(q => q?.prompt && q?.answer && q?.type)
+    .map((q, index) => ({
+      id: q.id || crypto.randomUUID?.() || `quiz-${Date.now()}-${index}`,
+      prompt: String(q.prompt),
+      type: q.type as QuizQuestion['type'],
+      options: Array.isArray(q.options) ? q.options.map(String) : [],
+      answer: String(q.answer),
+    }));
+}
+
+function formatFlashcardMessage(flashcards?: Flashcard[]) {
+  if (!flashcards || flashcards.length === 0) {
+    return 'I could not generate flashcards from that content. Try a clearer section of your notes.';
+  }
+  return `Generated ${flashcards.length} flashcards. Jump into the Flashcards tab to review them.`;
+}
+
+function formatQuizMessage(questions?: QuizQuestion[]) {
+  if (!questions || questions.length === 0) {
+    return 'I could not generate quiz questions from that content. Try a clearer section of your notes.';
+  }
+  return `Generated ${questions.length} quiz questions. Open the Quiz tab to practice.`;
 }

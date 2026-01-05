@@ -1,5 +1,11 @@
 import { Deadline } from '@/types';
 
+const startOfDay = (date: Date) => {
+  const copy = new Date(date);
+  copy.setHours(0, 0, 0, 0);
+  return copy;
+};
+
 /**
  * Parse various date formats into a Date object
  * Supports formats like:
@@ -23,7 +29,7 @@ function parseFlexibleDate(dateString: string): Date {
     const monthMap: Record<string, number> = {
       'Jan': 0, 'Feb': 1, 'Mar': 2, 'Apr': 3, 'May': 4, 'Jun': 5,
       'Jul': 6, 'Aug': 7, 'Sep': 8, 'Oct': 9, 'Nov': 10, 'Dec': 11,
-      'January': 0, 'February': 1, 'March': 2, 'April': 3, 'June': 5,
+      'January': 0, 'February': 1, 'March': 2, 'April': 3, 'May': 4, 'June': 5,
       'July': 6, 'August': 7, 'September': 8, 'October': 9, 'November': 10, 'December': 11
     };
 
@@ -43,28 +49,8 @@ function parseFlexibleDate(dateString: string): Date {
  * Returns the earliest future deadline, or the most recent past deadline if all are overdue
  */
 export function getNextDeadline(deadlines: Deadline[]): Deadline | null {
-  if (deadlines.length === 0) return null;
-
-  const now = new Date();
-  now.setHours(0, 0, 0, 0);
-
-  // Parse and sort deadlines by date
-  const sortedDeadlines = deadlines
-    .map(d => ({
-      ...d,
-      parsedDate: parseFlexibleDate(d.dueDate),
-    }))
-    .filter(d => !isNaN(d.parsedDate.getTime())) // Filter out invalid dates
-    .sort((a, b) => a.parsedDate.getTime() - b.parsedDate.getTime());
-
-  // Find the first upcoming deadline (today or future)
-  const upcoming = sortedDeadlines.find(d => {
-    const deadlineDate = new Date(d.parsedDate);
-    deadlineDate.setHours(0, 0, 0, 0);
-    return deadlineDate >= now;
-  });
-
-  return upcoming || sortedDeadlines[sortedDeadlines.length - 1]; // Return most recent if all are past
+  const { nextDeadline, closestDeadline } = getDeadlineStatus(deadlines);
+  return nextDeadline || closestDeadline;
 }
 
 /**
@@ -73,8 +59,7 @@ export function getNextDeadline(deadlines: Deadline[]): Deadline | null {
 export function formatDeadlineDisplay(deadline: Deadline | null): string {
   if (!deadline) return 'No deadlines';
 
-  const now = new Date();
-  now.setHours(0, 0, 0, 0);
+  const now = startOfDay(new Date());
   const deadlineDate = parseFlexibleDate(deadline.dueDate);
   deadlineDate.setHours(0, 0, 0, 0);
 
@@ -111,4 +96,73 @@ export function isDeadlineOverdue(deadlineText: string): boolean {
  */
 export function isDeadlineUrgent(deadlineText: string): boolean {
   return deadlineText.includes('today') || deadlineText.includes('tomorrow');
+}
+
+export interface DeadlineStatus {
+  nextDeadline: Deadline | null;
+  closestDeadline: Deadline | null;
+  isFinished: boolean;
+  hasUpcoming: boolean;
+}
+
+/**
+ * Determines the upcoming deadline, the closest deadline (even if past), and whether
+ * the course timeline is finished (all deadlines are in the past).
+ */
+export function getDeadlineStatus(deadlines: Deadline[]): DeadlineStatus {
+  if (deadlines.length === 0) {
+    return {
+      nextDeadline: null,
+      closestDeadline: null,
+      isFinished: false,
+      hasUpcoming: false,
+    };
+  }
+
+  const today = startOfDay(new Date());
+
+  const parsed = deadlines
+    .map(deadline => ({
+      deadline,
+      parsedDate: parseFlexibleDate(deadline.dueDate),
+    }))
+    .filter(item => !isNaN(item.parsedDate.getTime()))
+    .sort((a, b) => a.parsedDate.getTime() - b.parsedDate.getTime());
+
+  if (parsed.length === 0) {
+    return {
+      nextDeadline: null,
+      closestDeadline: null,
+      isFinished: false,
+      hasUpcoming: false,
+    };
+  }
+
+  const upcoming = parsed.find(item => startOfDay(item.parsedDate) >= today) || null;
+  const closest = upcoming || parsed[parsed.length - 1];
+
+  return {
+    nextDeadline: upcoming ? upcoming.deadline : null,
+    closestDeadline: closest ? closest.deadline : null,
+    isFinished: !upcoming && parsed.length > 0,
+    hasUpcoming: Boolean(upcoming),
+  };
+}
+
+/**
+ * Formats a deadline into a readable absolute date string for UI display
+ */
+export function formatAbsoluteDeadlineDate(deadline: Deadline | null): string | null {
+  if (!deadline) return null;
+
+  const parsed = parseFlexibleDate(deadline.dueDate);
+  if (isNaN(parsed.getTime())) {
+    return deadline.dueDate || null;
+  }
+
+  return parsed.toLocaleDateString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    year: parsed.getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined,
+  });
 }

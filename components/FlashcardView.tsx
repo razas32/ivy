@@ -1,17 +1,32 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { Flashcard } from '@/types';
 
-interface Flashcard {
-  id: string;
-  front: string;
-  back: string;
+interface FlashcardViewProps {
+  flashcards: Flashcard[];
+  isGenerating?: boolean;
+  onClear?: () => void;
 }
 
-export default function FlashcardView() {
-  const [flashcards] = useState<Flashcard[]>([]);
+export default function FlashcardView({ flashcards, isGenerating, onClear }: FlashcardViewProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isFlipped, setIsFlipped] = useState(false);
+
+  useEffect(() => {
+    setCurrentIndex(0);
+    setIsFlipped(false);
+  }, [flashcards]);
+
+  if (isGenerating) {
+    return (
+      <div className="h-full flex flex-col items-center justify-center text-center p-8 gap-3">
+        <div className="animate-spin rounded-full h-10 w-10 border-4 border-primary-200 border-t-primary-600" />
+        <p className="text-sm font-semibold text-gray-900">Generating flashcards...</p>
+        <p className="text-xs text-gray-600">This usually takes just a moment.</p>
+      </div>
+    );
+  }
 
   if (flashcards.length === 0) {
     return (
@@ -32,9 +47,19 @@ export default function FlashcardView() {
   const currentCard = flashcards[currentIndex];
 
   return (
-    <div className="h-full flex flex-col items-center justify-center p-8">
-      <div className="mb-4 text-sm text-gray-600">
-        Card {currentIndex + 1} of {flashcards.length}
+    <div className="h-full flex flex-col p-8">
+      <div className="flex items-center justify-between mb-4">
+        <div className="text-sm text-gray-600">
+          Card {currentIndex + 1} of {flashcards.length}
+        </div>
+        {onClear && (
+          <button
+            onClick={onClear}
+            className="text-sm font-semibold text-red-600 hover:text-red-700"
+          >
+            Clear
+          </button>
+        )}
       </div>
 
       <div

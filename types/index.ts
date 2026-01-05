@@ -86,3 +86,19 @@ export interface CourseExtractionResult {
   summary?: string | null;
   immediateActions?: string[];
 }
+
+export interface Flashcard {
+  id: string;
+  front: string;
+  back: string;
+}
+
+export type QuizQuestionType = 'mcq' | 'truefalse' | 'fill';
+
+export interface QuizQuestion {
+  id: string;
+  type: QuizQuestionType;
+  prompt: string;
+  options?: string[];
+  answer: string;
+}

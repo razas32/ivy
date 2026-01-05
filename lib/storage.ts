@@ -4,6 +4,8 @@ export const STORAGE_KEYS = {
   courses: `${STORAGE_PREFIX}:courses`,
   tasks: `${STORAGE_PREFIX}:tasks`,
   deadlines: `${STORAGE_PREFIX}:deadlines`,
+  flashcards: `${STORAGE_PREFIX}:flashcards`,
+  quizzes: `${STORAGE_PREFIX}:quizzes`,
 };
 
 const isBrowser = () => typeof window !== 'undefined';

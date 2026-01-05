@@ -5,10 +5,14 @@ import MessageBubble from './MessageBubble';
 import FlashcardView from './FlashcardView';
 import QuizView from './QuizView';
 import TypingIndicator from './TypingIndicator';
-import { CourseExtractionResult } from '@/types';
+import { CourseExtractionResult, Flashcard, QuizQuestion } from '@/types';
 
 interface StudyAssistantProps {
   onStructuredData?: (data: CourseExtractionResult) => void;
+  flashcards: Flashcard[];
+  quizQuestions: QuizQuestion[];
+  onFlashcardsGenerated?: (cards: Flashcard[]) => void;
+  onQuizGenerated?: (questions: QuizQuestion[]) => void;
 }
 
 interface Message {
@@ -19,9 +23,17 @@ interface Message {
 }
 
 type TabType = 'chat' | 'flashcards' | 'quizzes';
+type GenerationType = 'chat' | 'course' | 'flashcards' | 'quiz';
 
-export default function StudyAssistant({ onStructuredData }: StudyAssistantProps = {}) {
+export default function StudyAssistant({
+  onStructuredData,
+  flashcards,
+  quizQuestions,
+  onFlashcardsGenerated,
+  onQuizGenerated,
+}: StudyAssistantProps) {
   const [activeTab, setActiveTab] = useState<TabType>('chat');
+  const [generationType, setGenerationType] = useState<GenerationType>('chat');
   const [message, setMessage] = useState('');
   const [file, setFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -33,6 +45,7 @@ export default function StudyAssistant({ onStructuredData }: StudyAssistantProps
       content: "Hello! I'm Ivy, your AI study assistant. I can help you summarize lecture notes, create flashcards, and generate quizzes. What would you like to work on today?",
     },
   ]);
+  const [pendingGeneration, setPendingGeneration] = useState<GenerationType | null>(null);
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -87,6 +100,9 @@ export default function StudyAssistant({ onStructuredData }: StudyAssistantProps
     if (isThinking) return;
     if (!message.trim() && !file) return;
 
+    const requestGenerationType: GenerationType = generationType;
+    setPendingGeneration(requestGenerationType);
+
     const userMessage: Message = {
       id: Date.now().toString(),
       role: 'user',
@@ -113,45 +129,59 @@ export default function StudyAssistant({ onStructuredData }: StudyAssistantProps
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          messages: newMessages.map(msg => ({
-            role: msg.role,
-            content: msg.content,
-          })),
-          fileContent,
-        }),
-      });
+      body: JSON.stringify({
+        messages: newMessages.map(msg => ({
+          role: msg.role,
+          content: msg.content,
+        })),
+        fileContent,
+        generationType: requestGenerationType,
+      }),
+    });
 
-      if (!response.ok) {
-        throw new Error('Failed to get response');
-      }
+    if (!response.ok) {
+      throw new Error('Failed to get response');
+    }
 
-      const data = await response.json() as {
-        message?: string;
-        structuredData?: CourseExtractionResult;
-      };
+    const data = await response.json() as {
+      message?: string;
+      structuredData?: CourseExtractionResult;
+      flashcards?: Flashcard[];
+      quizQuestions?: QuizQuestion[];
+    };
 
-      const aiMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        role: 'assistant',
-        content: data.message || 'I apologize, but I encountered an error processing your request.',
-      };
+    const aiMessage: Message = {
+      id: (Date.now() + 1).toString(),
+      role: 'assistant',
+      content: data.message || 'I apologize, but I encountered an error processing your request.',
+    };
 
-      setMessages(prev => [...prev, aiMessage]);
+    setMessages(prev => [...prev, aiMessage]);
 
-      if (data.structuredData && onStructuredData) {
-        onStructuredData(data.structuredData);
-      }
-    } catch (error) {
-      console.error('Chat error:', error);
-      const errorMessage: Message = {
-        id: (Date.now() + 1).toString(),
+    if (data.structuredData && onStructuredData) {
+      onStructuredData(data.structuredData);
+    }
+
+    if (requestGenerationType === 'flashcards' && data.flashcards?.length) {
+      onFlashcardsGenerated?.(data.flashcards);
+      setActiveTab('flashcards');
+    }
+
+    if (requestGenerationType === 'quiz' && data.quizQuestions?.length) {
+      onQuizGenerated?.(data.quizQuestions);
+      setActiveTab('quizzes');
+    }
+  } catch (error) {
+    console.error('Chat error:', error);
+    const errorMessage: Message = {
+      id: (Date.now() + 1).toString(),
         role: 'assistant',
         content: `I apologize, but I encountered an error: ${error instanceof Error ? error.message : 'Please try again.'}`,
       };
       setMessages(prev => [...prev, errorMessage]);
     } finally {
       setIsThinking(false);
+      setPendingGeneration(null);
     }
   };
 
@@ -212,10 +242,11 @@ export default function StudyAssistant({ onStructuredData }: StudyAssistantProps
     };
   })();
 
-  const quickActions = [
-    { icon: '📝', label: 'Summarize Notes' },
-    { icon: '🎴', label: 'Create Flashcards' },
-    { icon: '📊', label: 'Generate Quiz' },
+  const quickActions: { icon: string; label: string; prompt: string; type: GenerationType; tab: TabType }[] = [
+    { icon: '💬', label: 'Ask Ivy', prompt: 'Explain this topic in simple terms.', type: 'chat', tab: 'chat' },
+    { icon: '📝', label: 'Ingest Outline', prompt: 'Extract courses, deadlines, and tasks from this outline.', type: 'course', tab: 'chat' },
+    { icon: '🎴', label: 'Create Flashcards', prompt: 'Create concise flashcards for key concepts.', type: 'flashcards', tab: 'flashcards' },
+    { icon: '📊', label: 'Generate Quiz', prompt: 'Generate 8 quiz questions (mix true/false and fill-in-the-blank) with answers.', type: 'quiz', tab: 'quizzes' },
   ];
 
   return (
@@ -249,7 +280,10 @@ export default function StudyAssistant({ onStructuredData }: StudyAssistantProps
 
           <div className="flex gap-2">
             <button
-              onClick={() => setActiveTab('chat')}
+              onClick={() => {
+                setActiveTab('chat');
+                setGenerationType('chat');
+              }}
               className={`flex-1 py-3 px-4 rounded-full font-medium text-sm transition-all ${
                 activeTab === 'chat'
                   ? 'bg-primary-600 text-primary-600 bg-opacity-10 shadow-md'
@@ -259,21 +293,29 @@ export default function StudyAssistant({ onStructuredData }: StudyAssistantProps
               Chat
             </button>
             <button
-              onClick={() => setActiveTab('flashcards')}
-              className={`flex-1 py-3 px-4 rounded-full font-medium text-sm transition-all ${
-                activeTab === 'flashcards'
-                  ? 'bg-primary-600 text-primary-600 bg-opacity-10 shadow-md'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+          onClick={() => {
+            setActiveTab('flashcards');
+            setGenerationType('flashcards');
+            setPendingGeneration(null);
+          }}
+          className={`flex-1 py-3 px-4 rounded-full font-medium text-sm transition-all ${
+            activeTab === 'flashcards'
+              ? 'bg-primary-600 text-primary-600 bg-opacity-10 shadow-md'
+              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
               }`}
             >
               Flashcards
             </button>
             <button
-              onClick={() => setActiveTab('quizzes')}
-              className={`flex-1 py-3 px-4 rounded-full font-medium text-sm transition-all ${
-                activeTab === 'quizzes'
-                  ? 'bg-primary-600 text-primary-600 bg-opacity-10 shadow-md'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+          onClick={() => {
+            setActiveTab('quizzes');
+            setGenerationType('quiz');
+            setPendingGeneration(null);
+          }}
+          className={`flex-1 py-3 px-4 rounded-full font-medium text-sm transition-all ${
+            activeTab === 'quizzes'
+              ? 'bg-primary-600 text-primary-600 bg-opacity-10 shadow-md'
+              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
               }`}
             >
               Quizzes
@@ -296,8 +338,20 @@ export default function StudyAssistant({ onStructuredData }: StudyAssistantProps
             </div>
           )}
 
-          {activeTab === 'flashcards' && <FlashcardView />}
-          {activeTab === 'quizzes' && <QuizView />}
+          {activeTab === 'flashcards' && (
+            <FlashcardView
+              flashcards={flashcards}
+              isGenerating={pendingGeneration === 'flashcards' && isThinking}
+              onClear={() => onFlashcardsGenerated?.([])}
+            />
+          )}
+          {activeTab === 'quizzes' && (
+            <QuizView
+              questions={quizQuestions}
+              isGenerating={pendingGeneration === 'quiz' && isThinking}
+              onClear={() => onQuizGenerated?.([])}
+            />
+          )}
         </div>
 
         <form
@@ -371,7 +425,11 @@ export default function StudyAssistant({ onStructuredData }: StudyAssistantProps
               <button
                 key={index}
                 type="button"
-                onClick={() => setMessage(action.label)}
+                onClick={() => {
+                  setMessage(action.prompt);
+                  setGenerationType(action.type);
+                  setActiveTab(action.tab);
+                }}
                 className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
               >
                 <span>{action.icon}</span>

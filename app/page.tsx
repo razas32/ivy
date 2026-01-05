@@ -6,9 +6,8 @@ import PomodoroCard from '@/components/PomodoroCard';
 import GradientStatsCard from '@/components/GradientStatsCard';
 import CourseCard from '@/components/CourseCard';
 import CourseModal from '@/components/CourseModal';
-import ChatBot from '@/components/ChatBot';
 import StudyAssistant from '@/components/StudyAssistant';
-import { Course, CourseColor, CourseExtractionResult, Deadline, ExtractedCourse, Task } from '@/types';
+import { Course, CourseColor, CourseExtractionResult, Deadline, ExtractedCourse, Flashcard, QuizQuestion, Task } from '@/types';
 import { mockCourses, mockDeadlines, mockTasks } from '@/lib/mockData';
 import { loadFromStorage, saveToStorage, STORAGE_KEYS } from '@/lib/storage';
 import { generateId } from '@/lib/utils';
@@ -52,6 +51,8 @@ export default function Dashboard() {
   const [courses, setCourses] = useState<Course[]>(mockCourses);
   const [tasks, setTasks] = useState<Task[]>(mockTasks);
   const [deadlines, setDeadlines] = useState<Deadline[]>(mockDeadlines);
+  const [flashcards, setFlashcards] = useState<Flashcard[]>([]);
+  const [quizQuestions, setQuizQuestions] = useState<QuizQuestion[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState<'create' | 'edit'>('create');
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
@@ -62,10 +63,14 @@ export default function Dashboard() {
     const storedCourses = loadFromStorage<Course[]>(STORAGE_KEYS.courses, mockCourses);
     const storedTasks = loadFromStorage<Task[]>(STORAGE_KEYS.tasks, mockTasks);
     const storedDeadlines = loadFromStorage<Deadline[]>(STORAGE_KEYS.deadlines, mockDeadlines);
+    const storedFlashcards = loadFromStorage<Flashcard[]>(STORAGE_KEYS.flashcards, []);
+    const storedQuizQuestions = loadFromStorage<QuizQuestion[]>(STORAGE_KEYS.quizzes, []);
 
     setCourses(storedCourses);
     setTasks(storedTasks);
     setDeadlines(storedDeadlines);
+    setFlashcards(storedFlashcards);
+    setQuizQuestions(storedQuizQuestions);
     setIsHydrated(true);
   }, []);
 
@@ -84,6 +89,16 @@ export default function Dashboard() {
     if (!isHydrated) return;
     saveToStorage(STORAGE_KEYS.deadlines, deadlines);
   }, [deadlines, isHydrated]);
+
+  useEffect(() => {
+    if (!isHydrated) return;
+    saveToStorage(STORAGE_KEYS.flashcards, flashcards);
+  }, [flashcards, isHydrated]);
+
+  useEffect(() => {
+    if (!isHydrated) return;
+    saveToStorage(STORAGE_KEYS.quizzes, quizQuestions);
+  }, [quizQuestions, isHydrated]);
 
   // Keep course progress in sync with tasks
   useEffect(() => {
@@ -227,6 +242,14 @@ export default function Dashboard() {
     }
   };
 
+  const handleFlashcardsGenerated = (cards: Flashcard[]) => {
+    setFlashcards(cards);
+  };
+
+  const handleQuizGenerated = (questions: QuizQuestion[]) => {
+    setQuizQuestions(questions);
+  };
+
   return (
     <div className="min-h-screen bg-surface-50">
       <Sidebar courses={courses} />
@@ -326,7 +349,13 @@ export default function Dashboard() {
           </div>
 
           {/* AI Study Assistant */}
-          <StudyAssistant onStructuredData={handleAssistantStructuredData} />
+          <StudyAssistant
+            onStructuredData={handleAssistantStructuredData}
+            flashcards={flashcards}
+            quizQuestions={quizQuestions}
+            onFlashcardsGenerated={handleFlashcardsGenerated}
+            onQuizGenerated={handleQuizGenerated}
+          />
         </div>
       </main>
 
@@ -338,9 +367,6 @@ export default function Dashboard() {
         course={selectedCourse}
         mode={modalMode}
       />
-
-      {/* General AI ChatBot */}
-      <ChatBot />
     </div>
   );
 }

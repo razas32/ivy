@@ -7,7 +7,7 @@ import { Course, Deadline, Task } from '@/types';
 import { mockCourses, mockDeadlines, mockTasks } from '@/lib/mockData';
 import { loadFromStorage, saveToStorage, STORAGE_KEYS } from '@/lib/storage';
 import { generateId } from '@/lib/utils';
-import { getNextDeadline, formatDeadlineDisplay } from '@/lib/deadlineUtils';
+import { formatDeadlineDisplay, getDeadlineStatus, formatAbsoluteDeadlineDate } from '@/lib/deadlineUtils';
 import { getCourseStatus, getStatusColorClass, getStatusBgClass } from '@/lib/courseStatusUtils';
 
 export default function CourseDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -291,11 +291,22 @@ export default function CourseDetailPage({ params }: { params: Promise<{ id: str
   const completedTasks = tasks.filter((task) => task.completed).length;
   const progressPercentage = tasks.length > 0 ? Math.round((completedTasks / tasks.length) * 100) : 0;
 
-  // Get the next upcoming deadline
-  const nextDeadline = getNextDeadline(deadlines);
+  // Determine upcoming deadline based purely on time (not task completion)
+  const { nextDeadline: upcomingDeadline, closestDeadline, isFinished: deadlinesFinished } = getDeadlineStatus(deadlines);
+  const isCourseFinished = deadlinesFinished;
 
   // Get intelligent course status
   const courseStatus = getCourseStatus(progressPercentage, deadlines, tasks.length);
+
+  const formattedClosestDeadlineDate = closestDeadline ? formatAbsoluteDeadlineDate(closestDeadline) : null;
+  const upcomingDeadlineText = isCourseFinished
+    ? 'Finished'
+    : formatDeadlineDisplay(upcomingDeadline || closestDeadline);
+  const upcomingDeadlineSubtitle = isCourseFinished
+    ? closestDeadline
+      ? `Last deadline: ${formattedClosestDeadlineDate || closestDeadline.title}`
+      : 'Course timeline complete'
+    : upcomingDeadline?.title || closestDeadline?.title || 'Add your first deadline';
 
   return (
     <div className="min-h-screen bg-surface-50">
@@ -354,9 +365,9 @@ export default function CourseDetailPage({ params }: { params: Promise<{ id: str
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                 </svg>
                 <div className="flex-1">
-                  <p className="text-lg font-semibold text-gray-900">{formatDeadlineDisplay(nextDeadline)}</p>
-                  {nextDeadline && (
-                    <p className="text-sm text-gray-500 mt-0.5">{nextDeadline.title}</p>
+                  <p className="text-lg font-semibold text-gray-900">{upcomingDeadlineText}</p>
+                  {upcomingDeadlineSubtitle && (
+                    <p className="text-sm text-gray-500 mt-0.5">{upcomingDeadlineSubtitle}</p>
                   )}
                 </div>
               </div>

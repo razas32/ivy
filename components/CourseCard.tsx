@@ -2,7 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { Course, Deadline } from '@/types';
-import { getNextDeadline, formatDeadlineDisplay, isDeadlineOverdue, isDeadlineUrgent } from '@/lib/deadlineUtils';
+import { formatDeadlineDisplay, formatAbsoluteDeadlineDate, getDeadlineStatus, isDeadlineOverdue, isDeadlineUrgent } from '@/lib/deadlineUtils';
 
 interface CourseCardProps {
   course: Course;
@@ -64,11 +64,14 @@ export default function CourseCard({ course, deadlines, onEdit, onDelete }: Cour
 
   // Get deadline information for this course
   const courseDeadlines = deadlines.filter(d => d.courseId === course.id);
-  const nextDeadline = getNextDeadline(courseDeadlines);
-  const deadlineText = formatDeadlineDisplay(nextDeadline);
-  const isOverdue = isDeadlineOverdue(deadlineText);
-  const isUrgent = isDeadlineUrgent(deadlineText);
-  const isCompleted = course.progress === 100;
+  const { nextDeadline: upcomingDeadline, closestDeadline, isFinished: deadlinesFinished } = getDeadlineStatus(courseDeadlines);
+  const deadlineForDisplay = upcomingDeadline || closestDeadline || null;
+  const deadlineText = deadlinesFinished ? 'Finished' : formatDeadlineDisplay(deadlineForDisplay);
+  const isOverdue = !deadlinesFinished && isDeadlineOverdue(deadlineText);
+  const isUrgent = !deadlinesFinished && isDeadlineUrgent(deadlineText);
+  const finishedDetail = deadlinesFinished
+    ? formatAbsoluteDeadlineDate(closestDeadline) || closestDeadline?.title || null
+    : null;
 
   return (
     <div
@@ -130,14 +133,19 @@ export default function CourseCard({ course, deadlines, onEdit, onDelete }: Cour
         </div>
       </div>
 
-      {/* Due Date */}
+      {/* Due Date (time-based, not tied to task completion) */}
       <div className="flex items-center gap-2">
-        {isCompleted ? (
+        {deadlinesFinished ? (
           <>
             <svg className="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
-            <span className="text-sm text-green-600 font-medium">All caught up!</span>
+            <div className="flex flex-col">
+              <span className="text-sm text-green-600 font-medium">Finished</span>
+              {finishedDetail && (
+                <span className="text-xs text-gray-600">{finishedDetail}</span>
+              )}
+            </div>
           </>
         ) : (
           <>
