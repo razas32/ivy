@@ -17,6 +17,7 @@ export interface Task {
   title: string;
   completed: boolean;
   createdAt: string;
+  parentTaskId?: string | null;
   dueDate?: string | null;
   priority?: 'low' | 'medium' | 'high';
   description?: string | null;
@@ -101,4 +102,27 @@ export interface QuizQuestion {
   prompt: string;
   options?: string[];
   answer: string;
+}
+
+export interface ResumeAnalysisReport {
+  matchScore: number;
+  matchedKeywords: string[];
+  missingKeywords: string[];
+  seniorityCues: string[];
+  recommendations: string[];
+  extractedResumePreview: string;
+}
+
+export interface CoverLetterGenerationResult {
+  draft: string;
+  outline: string[];
+  keywordsUsed: string[];
+}
+
+export interface GeneratedAsset {
+  id: string;
+  type: 'flashcards' | 'quiz' | 'cover_letter';
+  title: string;
+  createdAt: string;
+  content: string;
 }

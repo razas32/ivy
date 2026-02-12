@@ -196,9 +196,13 @@ const QUIZ_SCHEMA = {
 export async function POST(req: NextRequest) {
   try {
     const { messages, fileContent, generationType } = await req.json();
-    const mode: 'chat' | 'course' | 'flashcards' | 'quiz' = generationType || 'chat';
+    const mode: 'chat' | 'course' | 'flashcards' | 'quiz' =
+      generationType === 'course' || generationType === 'flashcards' || generationType === 'quiz'
+        ? generationType
+        : 'chat';
+    const safeMessages = Array.isArray(messages) ? messages : [];
 
-    console.log('Received request:', { messagesCount: messages?.length, hasFileContent: !!fileContent, mode });
+    console.log('Received request:', { messagesCount: safeMessages.length, hasFileContent: !!fileContent, mode });
 
     // Prepare messages for OpenAI
     const openaiMessages: any[] = [
@@ -206,9 +210,9 @@ export async function POST(req: NextRequest) {
     ];
 
     // Add conversation history
-    messages.forEach((msg: any) => {
+    safeMessages.forEach((msg: any) => {
       openaiMessages.push({
-        role: msg.role,
+        role: msg?.role === 'assistant' ? 'assistant' : 'user',
         content: msg.content || '',
       });
     });

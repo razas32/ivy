@@ -6,6 +6,33 @@ const startOfDay = (date: Date) => {
   return copy;
 };
 
+const MONTH_MAP: Record<string, number> = {
+  jan: 0,
+  january: 0,
+  feb: 1,
+  february: 1,
+  mar: 2,
+  march: 2,
+  apr: 3,
+  april: 3,
+  may: 4,
+  jun: 5,
+  june: 5,
+  jul: 6,
+  july: 6,
+  aug: 7,
+  august: 7,
+  sep: 8,
+  sept: 8,
+  september: 8,
+  oct: 9,
+  october: 9,
+  nov: 10,
+  november: 10,
+  dec: 11,
+  december: 11,
+};
+
 /**
  * Parse various date formats into a Date object
  * Supports formats like:
@@ -14,29 +41,26 @@ const startOfDay = (date: Date) => {
  * - "November 24, 2024"
  * - ISO strings
  */
-function parseFlexibleDate(dateString: string): Date {
-  // Try standard Date parsing first
-  let date = new Date(dateString);
-  if (!isNaN(date.getTime())) return date;
+export function parseFlexibleDate(dateString: string): Date {
+  const normalized = dateString.trim();
+  if (!normalized) return new Date('invalid');
 
-  // Handle "Mon. Nov. 24 @ 9:00am" format
-  const customFormatMatch = dateString.match(/(\w+\.?)\s+(\w+)\.?\s+(\d+)/);
+  // Try standard Date parsing first
+  let date = new Date(normalized);
+  if (!Number.isNaN(date.getTime())) return date;
+
+  // Handle formats like "Mon. Nov. 24 @ 9:00am" and "Nov 24"
+  const customFormatMatch = normalized.match(/(?:\w+\.?\s+)?([A-Za-z]+)\.?\s+(\d{1,2})(?:\D|$)/);
   if (customFormatMatch) {
-    const [, , month, day] = customFormatMatch;
+    const [, monthRaw, dayRaw] = customFormatMatch;
+    const monthKey = monthRaw.toLowerCase().replace('.', '');
+    const day = Number.parseInt(dayRaw, 10);
     const currentYear = new Date().getFullYear();
 
-    // Map month abbreviations to numbers
-    const monthMap: Record<string, number> = {
-      'Jan': 0, 'Feb': 1, 'Mar': 2, 'Apr': 3, 'May': 4, 'Jun': 5,
-      'Jul': 6, 'Aug': 7, 'Sep': 8, 'Oct': 9, 'Nov': 10, 'Dec': 11,
-      'January': 0, 'February': 1, 'March': 2, 'April': 3, 'May': 4, 'June': 5,
-      'July': 6, 'August': 7, 'September': 8, 'October': 9, 'November': 10, 'December': 11
-    };
-
-    const monthNum = monthMap[month];
-    if (monthNum !== undefined) {
-      date = new Date(currentYear, monthNum, parseInt(day));
-      if (!isNaN(date.getTime())) return date;
+    const monthNum = MONTH_MAP[monthKey];
+    if (monthNum !== undefined && Number.isFinite(day)) {
+      date = new Date(currentYear, monthNum, day);
+      if (!Number.isNaN(date.getTime())) return date;
     }
   }
 

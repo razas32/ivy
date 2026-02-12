@@ -11,6 +11,7 @@ import { Course, CourseColor, CourseExtractionResult, Deadline, ExtractedCourse,
 import { mockCourses, mockDeadlines, mockTasks } from '@/lib/mockData';
 import { loadFromStorage, saveToStorage, STORAGE_KEYS } from '@/lib/storage';
 import { generateId } from '@/lib/utils';
+import { buildAnalytics } from '@/lib/analytics';
 
 const COURSE_COLORS: CourseColor[] = ['blue', 'purple', 'green', 'orange', 'red', 'pink'];
 
@@ -106,7 +107,7 @@ export default function Dashboard() {
 
     setCourses(prevCourses =>
       prevCourses.map(course => {
-        const courseTasks = tasks.filter(task => task.courseId === course.id);
+        const courseTasks = tasks.filter(task => task.courseId === course.id && !task.parentTaskId);
 
         const completed = courseTasks.filter(task => task.completed).length;
         const total = courseTasks.length;
@@ -131,11 +132,28 @@ export default function Dashboard() {
   }, [tasks, isHydrated]);
 
   const stats = useMemo(() => ({
-    tasksCompleted: tasks.filter(task => task.completed).length,
-    totalTasks: tasks.length,
+    tasksCompleted: tasks.filter(task => !task.parentTaskId && task.completed).length,
+    totalTasks: tasks.filter(task => !task.parentTaskId).length,
     upcomingDeadlines: deadlines.length,
     activeCourses: courses.length,
   }), [courses, deadlines, tasks]);
+
+  const analytics = useMemo(() => buildAnalytics(tasks, deadlines), [tasks, deadlines]);
+
+  const downloadCsv = (rows: string[][], filename: string) => {
+    const csv = rows
+      .map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+      .join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', filename);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
 
   // CRUD Operations
   const handleCreateCourse = () => {
@@ -212,6 +230,7 @@ export default function Dashboard() {
           title: task.title,
           completed: false,
           createdAt: new Date().toISOString(),
+          parentTaskId: null,
           dueDate: task.dueDate || undefined,
           priority: task.priority,
           description: task.description || undefined,
@@ -258,8 +277,57 @@ export default function Dashboard() {
         <div className="max-w-7xl mx-auto p-8">
           {/* Header */}
           <div className="mb-8">
-            <h1 className="text-3xl font-bold text-primary-600 mb-2">Welcome back!</h1>
-            <p className="text-gray-600">Here's your academic overview</p>
+            <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-3">
+              <div>
+                <h1 className="text-3xl font-bold text-primary-600 mb-2">Welcome back!</h1>
+                <p className="text-gray-600">Here's your academic overview</p>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() =>
+                    downloadCsv(
+                      [
+                        ['id', 'courseId', 'title', 'completed', 'priority', 'dueDate', 'parentTaskId'],
+                        ...tasks.map((task) => [
+                          task.id,
+                          task.courseId,
+                          task.title,
+                          task.completed ? 'true' : 'false',
+                          task.priority || '',
+                          task.dueDate || '',
+                          task.parentTaskId || '',
+                        ]),
+                      ],
+                      'tasks-export.csv'
+                    )
+                  }
+                  className="px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50"
+                >
+                  Export Tasks CSV
+                </button>
+                <button
+                  onClick={() =>
+                    downloadCsv(
+                      [
+                        ['id', 'courseId', 'title', 'dueDate', 'priority', 'description'],
+                        ...deadlines.map((deadline) => [
+                          deadline.id,
+                          deadline.courseId,
+                          deadline.title,
+                          deadline.dueDate,
+                          deadline.priority,
+                          deadline.description || '',
+                        ]),
+                      ],
+                      'deadlines-export.csv'
+                    )
+                  }
+                  className="px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50"
+                >
+                  Export Deadlines CSV
+                </button>
+              </div>
+            </div>
           </div>
 
           {/* Stats Grid */}
@@ -305,6 +373,46 @@ export default function Dashboard() {
               gradient="linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)"
               iconBg="bg-white"
             />
+          </div>
+
+          <div className="card p-6 border border-gray-200 mb-8">
+            <h2 className="text-xl font-semibold text-gray-900 mb-4">Progress Analytics</h2>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-5">
+              <div className="p-4 rounded-xl border border-gray-200 bg-surface-50">
+                <p className="text-sm text-gray-500">Completed Tasks</p>
+                <p className="text-2xl font-bold text-gray-900">{analytics.completedTasks}/{analytics.totalTasks}</p>
+              </div>
+              <div className="p-4 rounded-xl border border-gray-200 bg-surface-50">
+                <p className="text-sm text-gray-500">Overdue Deadlines</p>
+                <p className="text-2xl font-bold text-red-600">{analytics.overdueDeadlines}</p>
+              </div>
+              <div className="p-4 rounded-xl border border-gray-200 bg-surface-50">
+                <p className="text-sm text-gray-500">Due In 7 Days</p>
+                <p className="text-2xl font-bold text-amber-600">{analytics.dueSoonDeadlines}</p>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-gray-700">Weekly Burn-down</p>
+              {analytics.burnDown.length === 0 ? (
+                <p className="text-sm text-gray-600">Not enough task history yet.</p>
+              ) : (
+                <div className="space-y-2">
+                  {analytics.burnDown.map((bucket) => {
+                    const completionRatio = bucket.created > 0 ? Math.round((bucket.completed / bucket.created) * 100) : 0;
+                    return (
+                      <div key={bucket.label} className="grid grid-cols-[120px,1fr,70px] items-center gap-3">
+                        <span className="text-xs text-gray-600">{bucket.label}</span>
+                        <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+                          <div className="h-full bg-course-green" style={{ width: `${completionRatio}%` }} />
+                        </div>
+                        <span className="text-xs text-gray-700">{bucket.completed}/{bucket.created}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Courses Section */}

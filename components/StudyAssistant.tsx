@@ -86,7 +86,7 @@ export default function StudyAssistant({
     const files = e.dataTransfer.files;
     if (files && files[0]) {
       const droppedFile = files[0];
-      const acceptedTypes = ['.pdf', '.doc', '.docx', '.txt', '.jpg', '.jpeg', '.png'];
+      const acceptedTypes = ['.pdf', '.txt'];
       const fileExtension = '.' + droppedFile.name.split('.').pop()?.toLowerCase();
 
       if (acceptedTypes.includes(fileExtension)) {
@@ -186,61 +186,21 @@ export default function StudyAssistant({
   };
 
   const readFileContent = async (file: File): Promise<string> => {
-    if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
-      return await readPDFContent(file);
-    }
+    const formData = new FormData();
+    formData.set('file', file);
 
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        resolve(e.target?.result as string);
-      };
-      reader.onerror = reject;
-      reader.readAsText(file);
+    const response = await fetch('/api/uploads/extract', {
+      method: 'POST',
+      body: formData,
     });
-  };
 
-  const readPDFContent = async (file: File): Promise<string> => {
-    try {
-      const pdfjsLib = await getPdfJs();
-
-      const arrayBuffer = await file.arrayBuffer();
-      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-
-      let fullText = '';
-
-      for (let i = 1; i <= pdf.numPages; i++) {
-        const page = await pdf.getPage(i);
-        const textContent = await page.getTextContent();
-        const pageText = textContent.items
-          .map((item: any) => item.str)
-          .join(' ');
-        fullText += pageText + '\n\n';
-      }
-
-      return fullText;
-    } catch (error) {
-      console.error('Error reading PDF:', error);
-      throw new Error('Failed to read PDF file');
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data?.error || 'Failed to process file.');
     }
+
+    return data.text || '';
   };
-
-  const getPdfJs = (() => {
-    let loader: Promise<typeof import('pdfjs-dist')> | null = null;
-
-    return async () => {
-      if (!loader) {
-        loader = import('pdfjs-dist').then(pdfjs => {
-          if (typeof window !== 'undefined' && !pdfjs.GlobalWorkerOptions.workerSrc) {
-            pdfjs.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
-          }
-          return pdfjs;
-        });
-      }
-
-      return loader;
-    };
-  })();
 
   const quickActions: { icon: string; label: string; prompt: string; type: GenerationType; tab: TabType }[] = [
     { icon: '💬', label: 'Ask Ivy', prompt: 'Explain this topic in simple terms.', type: 'chat', tab: 'chat' },
@@ -265,7 +225,7 @@ export default function StudyAssistant({
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
               </svg>
               <p className="text-xl font-semibold text-primary-700">Drop your file here</p>
-              <p className="text-sm text-primary-600 mt-2">PDF, DOC, DOCX, TXT, JPG, PNG</p>
+              <p className="text-sm text-primary-600 mt-2">PDF or TXT up to 10MB</p>
             </div>
           </div>
         )}
@@ -381,7 +341,7 @@ export default function StudyAssistant({
               type="file"
               id="chat-file-upload"
               className="hidden"
-              accept=".pdf,.doc,.docx,.txt,.jpg,.jpeg,.png"
+              accept=".pdf,.txt"
               onChange={handleFileUpload}
             />
             <label

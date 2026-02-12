@@ -33,6 +33,7 @@ export default function CourseDetailPage({ params }: { params: Promise<{ id: str
     description: '',
     category: '',
   });
+  const [subtaskDrafts, setSubtaskDrafts] = useState<Record<string, string>>({});
 
   useEffect(() => {
     params.then((p) => {
@@ -58,7 +59,7 @@ export default function CourseDetailPage({ params }: { params: Promise<{ id: str
       const updated = prev.map((course) => {
         if (course.id !== courseId) return course;
 
-        const courseTasks = allTasks.filter((task) => task.courseId === courseId);
+        const courseTasks = allTasks.filter((task) => task.courseId === courseId && !task.parentTaskId);
 
         const completed = courseTasks.filter((task) => task.completed).length;
         const total = courseTasks.length;
@@ -109,6 +110,19 @@ export default function CourseDetailPage({ params }: { params: Promise<{ id: str
     () => allTasks.filter((task) => task.courseId === courseId),
     [allTasks, courseId]
   );
+
+  const rootTasks = useMemo(
+    () => tasks.filter((task) => !task.parentTaskId),
+    [tasks]
+  );
+
+  const subtasksByParent = useMemo(() => {
+    return tasks.reduce<Record<string, Task[]>>((acc, task) => {
+      if (!task.parentTaskId) return acc;
+      acc[task.parentTaskId] = [...(acc[task.parentTaskId] || []), task];
+      return acc;
+    }, {});
+  }, [tasks]);
 
   const deadlines = useMemo(
     () => allDeadlines.filter((deadline) => deadline.courseId === courseId),
@@ -196,6 +210,7 @@ export default function CourseDetailPage({ params }: { params: Promise<{ id: str
       title: newTask.title.trim(),
       completed: false,
       createdAt: new Date().toISOString(),
+      parentTaskId: null,
       dueDate: newTask.dueDate.trim() || null,
       priority: newTask.priority,
       description: newTask.description.trim() || null,
@@ -219,6 +234,27 @@ export default function CourseDetailPage({ params }: { params: Promise<{ id: str
         task.id === taskId ? { ...task, completed: !task.completed } : task
       )
     );
+  };
+
+  const handleAddSubtask = (parentTaskId: string) => {
+    const title = (subtaskDrafts[parentTaskId] || '').trim();
+    if (!title || !courseId) return;
+
+    const subtask: Task = {
+      id: generateId(),
+      courseId,
+      parentTaskId,
+      title,
+      completed: false,
+      createdAt: new Date().toISOString(),
+      dueDate: null,
+      priority: 'medium',
+      description: null,
+      category: 'Subtask',
+    };
+
+    setAllTasks((prev) => [...prev, subtask]);
+    setSubtaskDrafts((prev) => ({ ...prev, [parentTaskId]: '' }));
   };
 
   const handleAddDeadline = () => {
@@ -288,15 +324,15 @@ export default function CourseDetailPage({ params }: { params: Promise<{ id: str
     );
   }
 
-  const completedTasks = tasks.filter((task) => task.completed).length;
-  const progressPercentage = tasks.length > 0 ? Math.round((completedTasks / tasks.length) * 100) : 0;
+  const completedTasks = rootTasks.filter((task) => task.completed).length;
+  const progressPercentage = rootTasks.length > 0 ? Math.round((completedTasks / rootTasks.length) * 100) : 0;
 
   // Determine upcoming deadline based purely on time (not task completion)
   const { nextDeadline: upcomingDeadline, closestDeadline, isFinished: deadlinesFinished } = getDeadlineStatus(deadlines);
   const isCourseFinished = deadlinesFinished;
 
   // Get intelligent course status
-  const courseStatus = getCourseStatus(progressPercentage, deadlines, tasks.length);
+  const courseStatus = getCourseStatus(progressPercentage, deadlines, rootTasks.length);
 
   const formattedClosestDeadlineDate = closestDeadline ? formatAbsoluteDeadlineDate(closestDeadline) : null;
   const upcomingDeadlineText = isCourseFinished
@@ -350,7 +386,7 @@ export default function CourseDetailPage({ params }: { params: Promise<{ id: str
                   />
                 </svg>
                 <div className="absolute inset-0 flex items-center justify-center">
-                  <span className="text-sm font-semibold text-gray-700">{completedTasks}/{tasks.length}</span>
+                  <span className="text-sm font-semibold text-gray-700">{completedTasks}/{rootTasks.length}</span>
                 </div>
               </div>
             </div>
@@ -374,7 +410,7 @@ export default function CourseDetailPage({ params }: { params: Promise<{ id: str
             </div>
             <div className="card p-4 border-2 border-gray-100">
               <h3 className="text-sm font-medium text-gray-500 mb-1">Tasks Completed</h3>
-              <p className="text-lg font-semibold text-gray-900">{completedTasks} of {tasks.length}</p>
+              <p className="text-lg font-semibold text-gray-900">{completedTasks} of {rootTasks.length}</p>
               <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
                 <div
                   className="h-2 rounded-full transition-all duration-300"
@@ -622,7 +658,7 @@ export default function CourseDetailPage({ params }: { params: Promise<{ id: str
                   </div>
                 )}
 
-                {tasks.length === 0 ? (
+                {rootTasks.length === 0 ? (
                   <div className="text-center py-12">
                     <svg className="w-16 h-16 text-gray-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
@@ -631,32 +667,67 @@ export default function CourseDetailPage({ params }: { params: Promise<{ id: str
                   </div>
                 ) : (
                   <div className="space-y-3">
-                    {tasks.map((task) => (
-                      <div
-                        key={task.id}
-                        className={`flex items-center gap-4 p-4 rounded-xl border-2 transition-all ${
-                          task.completed
-                            ? 'bg-gray-50 border-gray-200'
-                            : 'bg-white border-gray-200 hover:border-gray-300 hover:shadow-sm'
-                        }`}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={task.completed}
-                          onChange={() => handleToggleTask(task.id)}
-                          className={`w-6 h-6 rounded-lg border-2 cursor-pointer ${getTextColorClass(course.color)}`}
-                          style={{ accentColor: getCourseColorClass(course.color).split(' ')[0].replace('bg-', '#') }}
-                        />
-                        <span className={`flex-1 text-lg ${task.completed ? 'line-through text-gray-400' : 'text-gray-900 font-medium'}`}>
-                          {task.title}
-                        </span>
-                        {task.completed && (
-                          <span className="bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs font-medium">
-                            ✓ Done
-                          </span>
-                        )}
-                      </div>
-                    ))}
+                    {rootTasks.map((task) => {
+                      const subtasks = subtasksByParent[task.id] || [];
+                      return (
+                        <div
+                          key={task.id}
+                          className={`p-4 rounded-xl border-2 transition-all ${
+                            task.completed
+                              ? 'bg-gray-50 border-gray-200'
+                              : 'bg-white border-gray-200 hover:border-gray-300 hover:shadow-sm'
+                          }`}
+                        >
+                          <div className="flex items-center gap-4">
+                            <input
+                              type="checkbox"
+                              checked={task.completed}
+                              onChange={() => handleToggleTask(task.id)}
+                              className={`w-6 h-6 rounded-lg border-2 cursor-pointer ${getTextColorClass(course.color)}`}
+                              style={{ accentColor: getProgressBarColor(course.color) }}
+                            />
+                            <span className={`flex-1 text-lg ${task.completed ? 'line-through text-gray-400' : 'text-gray-900 font-medium'}`}>
+                              {task.title}
+                            </span>
+                            {task.completed && (
+                              <span className="bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs font-medium">
+                                ✓ Done
+                              </span>
+                            )}
+                          </div>
+
+                          <div className="mt-3 ml-10 space-y-2">
+                            {subtasks.map((subtask) => (
+                              <label key={subtask.id} className="flex items-center gap-2 text-sm text-gray-700">
+                                <input
+                                  type="checkbox"
+                                  checked={subtask.completed}
+                                  onChange={() => handleToggleTask(subtask.id)}
+                                  className="w-4 h-4"
+                                />
+                                <span className={subtask.completed ? 'line-through text-gray-400' : ''}>{subtask.title}</span>
+                              </label>
+                            ))}
+                            <div className="flex gap-2">
+                              <input
+                                value={subtaskDrafts[task.id] || ''}
+                                onChange={(e) =>
+                                  setSubtaskDrafts((prev) => ({ ...prev, [task.id]: e.target.value }))
+                                }
+                                placeholder="Add subtask"
+                                className="flex-1 px-2 py-1 border border-gray-300 rounded text-sm"
+                              />
+                              <button
+                                onClick={() => handleAddSubtask(task.id)}
+                                className="px-2 py-1 text-sm border border-gray-300 rounded hover:bg-gray-100"
+                              >
+                                Add
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
               </div>

@@ -1,4 +1,5 @@
 import { Deadline } from '@/types';
+import { parseFlexibleDate } from '@/lib/deadlineUtils';
 
 export interface CourseStatus {
   status: string;
@@ -186,7 +187,7 @@ function getDaysUntilNearestDeadline(deadlines: Deadline[]): number | null {
 
   const sortedDeadlines = deadlines
     .map(d => {
-      const deadlineDate = new Date(d.dueDate);
+      const deadlineDate = parseFlexibleDate(d.dueDate);
       deadlineDate.setHours(0, 0, 0, 0);
       const diffTime = deadlineDate.getTime() - now.getTime();
       const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
