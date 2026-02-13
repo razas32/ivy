@@ -4,13 +4,18 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { Course } from '@/types';
+import { useAuth } from './AuthProvider';
 
 interface SidebarProps {
   courses: Course[];
 }
 
+const navItemBase =
+  'w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2';
+
 export default function Sidebar({ courses }: SidebarProps) {
   const pathname = usePathname();
+  const { isAuthenticated, openAuthModal, logout } = useAuth();
 
   const getCourseColorClass = (color: string) => {
     const colorMap: Record<string, string> = {
@@ -25,67 +30,82 @@ export default function Sidebar({ courses }: SidebarProps) {
   };
 
   return (
-    <aside className="w-64 h-screen bg-white border-r border-gray-200 flex flex-col fixed left-0 top-0">
-      {/* Logo */}
-      <div className="p-6 border-b border-gray-200">
-        <div className="flex justify-start pl-8">
+    <aside className="w-64 h-screen bg-white/95 border-r border-gray-200/90 backdrop-blur-sm flex flex-col fixed left-0 top-0">
+      <div className="p-5 border-b border-gray-200/80">
+        <div className="flex justify-start pl-3">
           <Image
             src="/ivy_logo.png"
             alt="Ivy Logo"
-            width={160}
-            height={80}
-            className="h-16 w-auto"
+            width={150}
+            height={70}
+            className="h-14 w-auto"
             priority
           />
         </div>
       </div>
 
-      {/* Navigation */}
-      <nav className="flex-1 overflow-y-auto py-4">
-        <div className="px-3 mb-6">
-          <Link
-            href="/"
-            className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${
-              pathname === '/'
-                ? 'bg-primary-50 text-primary-700'
-                : 'text-gray-700 hover:bg-gray-100'
-            }`}
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-            </svg>
-            <span className="font-medium">Dashboard</span>
-          </Link>
-          <Link
-            href="/calendar"
-            className={`mt-1 w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${
-              pathname.startsWith('/calendar')
-                ? 'bg-primary-50 text-primary-700'
-                : 'text-gray-700 hover:bg-gray-100'
-            }`}
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-            </svg>
-            <span className="font-medium">Calendar</span>
-          </Link>
+      <nav className="flex-1 overflow-y-auto py-5 px-3">
+        <div className="mb-6">
+          <p className="px-3 mb-2 text-[11px] font-semibold text-gray-400 tracking-[0.12em] uppercase">Workspace</p>
+          <div className="space-y-1">
+            <Link
+              href="/"
+              className={`${navItemBase} ${
+                pathname === '/'
+                  ? 'bg-primary-50 text-primary-700 border border-primary-100'
+                  : 'text-gray-700 hover:bg-gray-100/80'
+              }`}
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+              </svg>
+              <span className="font-medium">Dashboard</span>
+            </Link>
+            <Link
+              href="/calendar"
+              className={`${navItemBase} ${
+                pathname.startsWith('/calendar')
+                  ? 'bg-primary-50 text-primary-700 border border-primary-100'
+                  : 'text-gray-700 hover:bg-gray-100/80'
+              }`}
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+              <span className="font-medium">Calendar</span>
+            </Link>
+            <Link
+              href="/ai"
+              className={`${navItemBase} ${
+                pathname.startsWith('/ai')
+                  ? 'bg-primary-50 text-primary-700 border border-primary-100'
+                  : 'text-gray-700 hover:bg-gray-100/80'
+              }`}
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v2m0 14v2m9-9h-2M5 12H3m13.657-6.657l-1.414 1.414M8.757 15.243l-1.414 1.414m9.9 0-1.414-1.414M8.757 8.757 7.343 7.343M9 9h6v6H9V9z" />
+              </svg>
+              <span className="font-medium">AIvy</span>
+            </Link>
+          </div>
         </div>
 
-        {/* My Courses */}
-        <div className="px-3">
-          <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider px-3 mb-2">
-            My Courses
-          </h3>
+        <div className="mb-6">
+          <p className="px-3 mb-2 text-[11px] font-semibold text-gray-400 tracking-[0.12em] uppercase">Courses</p>
           <div className="space-y-1">
             {courses.map((course) => (
               <Link
                 key={course.id}
                 href={`/courses/${course.id}`}
-                className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-gray-700 hover:bg-gray-100 transition-colors"
+                className={`${navItemBase} ${
+                  pathname === `/courses/${course.id}`
+                    ? 'bg-primary-50 text-primary-700 border border-primary-100'
+                    : 'text-gray-700 hover:bg-gray-100/80'
+                }`}
               >
-                <div className={`w-2 h-2 rounded-full flex-shrink-0 ${getCourseColorClass(course.color)}`} />
+                <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${getCourseColorClass(course.color)}`} />
                 <div className="flex-1 min-w-0 text-left">
-                  <p className="text-sm font-medium truncate">{course.code}</p>
+                  <p className="text-sm font-semibold truncate">{course.code}</p>
                   <p className="text-xs text-gray-500 truncate">{course.name}</p>
                 </div>
               </Link>
@@ -93,41 +113,62 @@ export default function Sidebar({ courses }: SidebarProps) {
           </div>
         </div>
 
-        {/* Career Prep */}
-        <div className="px-3 mt-6">
-          <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider px-3 mb-2">
-            Career Prep
-          </h3>
-          <Link
-            href="/resume-analyzer"
-            className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-gray-700 hover:bg-gray-100 transition-colors"
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-            </svg>
-            <span className="text-sm font-medium">Resume Analyzer</span>
-          </Link>
-          <Link
-            href="/cover-letter-generator"
-            className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-gray-700 hover:bg-gray-100 transition-colors"
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8m-2 9H5a2 2 0 01-2-2V7a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2z" />
-            </svg>
-            <span className="text-sm font-medium">Cover Letter Generator</span>
-          </Link>
+        <div>
+          <p className="px-3 mb-2 text-[11px] font-semibold text-gray-400 tracking-[0.12em] uppercase">Career</p>
+          <div className="space-y-1">
+            <Link
+              href="/resume-analyzer"
+              className={`${navItemBase} ${
+                pathname.startsWith('/resume-analyzer')
+                  ? 'bg-primary-50 text-primary-700 border border-primary-100'
+                  : 'text-gray-700 hover:bg-gray-100/80'
+              }`}
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              <span className="text-sm font-medium">Resume Analyzer</span>
+            </Link>
+            <Link
+              href="/cover-letter-generator"
+              className={`${navItemBase} ${
+                pathname.startsWith('/cover-letter-generator')
+                  ? 'bg-primary-50 text-primary-700 border border-primary-100'
+                  : 'text-gray-700 hover:bg-gray-100/80'
+              }`}
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8m-2 9H5a2 2 0 01-2-2V7a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2z" />
+              </svg>
+              <span className="text-sm font-medium">Cover Letter</span>
+            </Link>
+          </div>
         </div>
       </nav>
 
-      {/* Settings */}
-      <div className="p-3 border-t border-gray-200">
-        <button className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-gray-700 hover:bg-gray-100 transition-colors">
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-          </svg>
-          <span className="text-sm font-medium">Settings</span>
-        </button>
+      <div className="p-3 border-t border-gray-200/80">
+        {isAuthenticated ? (
+          <button
+            onClick={logout}
+            className={`${navItemBase} text-gray-700 hover:bg-gray-100/80`}
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H9m8 4v1a2 2 0 01-2 2H6a2 2 0 01-2-2V7a2 2 0 012-2h9a2 2 0 012 2v1" />
+            </svg>
+            <span className="text-sm font-medium">Log Out</span>
+          </button>
+        ) : (
+          <button
+            onClick={openAuthModal}
+            className={`${navItemBase} text-gray-700 hover:bg-gray-100/80`}
+            data-auth-exempt="true"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h14m0 0l-4-4m4 4l-4 4M5 5h6a2 2 0 012 2v1M5 19h6a2 2 0 002-2v-1" />
+            </svg>
+            <span className="text-sm font-medium">Log In</span>
+          </button>
+        )}
       </div>
     </aside>
   );

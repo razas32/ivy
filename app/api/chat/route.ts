@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
 import { CourseExtractionResult, Flashcard, QuizQuestion } from '@/types';
+import { requireAuthenticatedUser } from '@/lib/server/auth';
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -10,7 +11,18 @@ const SYSTEM_PROMPT = `You are Ivy, an AI study assistant. Extract course struct
 
 Respond ONLY with JSON that matches the provided schema exactly. Populate every field you can from the source material, leave arrays empty when no data is available, and set a field to null rather than inventing details when the document does not state them. Estimate reasonable priorities for deadlines/tasks (low, medium, high) when not stated.`;
 
-const GENERAL_PROMPT = `You are Ivy, an AI study assistant. Answer succinctly and helpfully. You can summarize material, tutor on concepts, draft study plans, or answer career questions. Prefer plain text without markdown unless formatting improves clarity.`;
+const GENERAL_PROMPT = `You are Ivy, an AI study assistant.
+
+Write clean, concise markdown that is easy to scan on mobile and desktop.
+
+Style rules:
+- Prefer short sections with clear headings (## or ###).
+- Use flat bullet lists for steps/checklists.
+- Use bold only for key terms.
+- Use fenced code blocks only when needed.
+- Keep responses compact and avoid filler.
+- Do not include citations unless asked.
+- End with one practical next step when action is useful.`;
 
 const COURSE_EXTRACTION_SCHEMA = {
   name: 'course_extraction',
@@ -194,6 +206,9 @@ const QUIZ_SCHEMA = {
 } as const;
 
 export async function POST(req: NextRequest) {
+  const { errorResponse } = await requireAuthenticatedUser(req);
+  if (errorResponse) return errorResponse;
+
   try {
     const { messages, fileContent, generationType } = await req.json();
     const mode: 'chat' | 'course' | 'flashcards' | 'quiz' =
@@ -205,7 +220,7 @@ export async function POST(req: NextRequest) {
     console.log('Received request:', { messagesCount: safeMessages.length, hasFileContent: !!fileContent, mode });
 
     // Prepare messages for OpenAI
-    const openaiMessages: any[] = [
+    const openaiMessages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
       { role: 'system', content: getSystemPrompt(mode) },
     ];
 
@@ -234,6 +249,9 @@ export async function POST(req: NextRequest) {
     console.log('Calling OpenAI API with', openaiMessages.length, 'messages for mode', mode);
 
     const responseFormat = getResponseFormat(mode);
+    if (mode === 'chat') {
+      return streamChatCompletion(openaiMessages);
+    }
 
     // Call OpenAI API with JSON schema response when needed
     const completion = await openai.chat.completions.create({
@@ -275,7 +293,7 @@ export async function POST(req: NextRequest) {
         ? formatQuizMessage(quizQuestions)
         : mode === 'course'
         ? formatAssistantMessage(structuredData)
-        : rawContent || 'How else can I help?';
+        : normalizeChatMarkdown(rawContent || '');
 
     return NextResponse.json({
       message: assistantMessage,
@@ -296,6 +314,92 @@ export async function POST(req: NextRequest) {
       { status: 500 }
     );
   }
+}
+
+function streamChatCompletion(
+  openaiMessages: OpenAI.Chat.Completions.ChatCompletionMessageParam[]
+) {
+  const encoder = new TextEncoder();
+
+  const stream = new ReadableStream({
+    async start(controller) {
+      let accumulated = '';
+      try {
+        const completionStream = await openai.chat.completions.create({
+          model: 'gpt-4o-mini',
+          messages: openaiMessages,
+          temperature: 0.2,
+          max_tokens: 4000,
+          stream: true,
+        });
+
+        for await (const chunk of completionStream) {
+          const delta = chunk.choices[0]?.delta?.content;
+          if (!delta) continue;
+          accumulated += delta;
+          controller.enqueue(
+            encoder.encode(`data: ${JSON.stringify({ type: 'delta', content: delta })}\n\n`)
+          );
+        }
+
+        const normalized = normalizeChatMarkdown(accumulated);
+        controller.enqueue(
+          encoder.encode(`data: ${JSON.stringify({ type: 'done', message: normalized })}\n\n`)
+        );
+      } catch (error: unknown) {
+        const message =
+          error instanceof Error ? error.message : 'Failed to stream response from AI.';
+        controller.enqueue(
+          encoder.encode(`data: ${JSON.stringify({ type: 'error', error: message })}\n\n`)
+        );
+      } finally {
+        controller.close();
+      }
+    },
+  });
+
+  return new Response(stream, {
+    headers: {
+      'Content-Type': 'text/event-stream; charset=utf-8',
+      'Cache-Control': 'no-cache, no-transform',
+      Connection: 'keep-alive',
+    },
+  });
+}
+
+function normalizeChatMarkdown(raw: string) {
+  const fallback = 'How else can I help?';
+  if (!raw || typeof raw !== 'string') return fallback;
+
+  let content = raw.replace(/\r\n/g, '\n').trim();
+  if (!content) return fallback;
+
+  const fencedMarkdownMatch = content.match(/^```(?:markdown|md)?\n([\s\S]*?)\n```$/i);
+  if (fencedMarkdownMatch) {
+    content = fencedMarkdownMatch[1].trim();
+  }
+
+  content = content
+    .replace(/^(sure|absolutely|of course|certainly)[!.]?\s*\n+/i, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .replace(/([^\n])\n(#{1,3}\s)/g, '$1\n\n$2')
+    .replace(/([^\n])\n([-*]\s)/g, '$1\n\n$2')
+    .replace(/([^\n])\n(\d+\.\s)/g, '$1\n\n$2')
+    .trim();
+
+  const dedupedLines: string[] = [];
+  for (const line of content.split('\n')) {
+    const trimmed = line.trim();
+    const prev = dedupedLines[dedupedLines.length - 1]?.trim();
+    if (trimmed && prev && trimmed.toLowerCase() === prev.toLowerCase()) {
+      continue;
+    }
+    dedupedLines.push(line);
+  }
+
+  content = dedupedLines.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+
+  return content || fallback;
 }
 
 function formatAssistantMessage(data: CourseExtractionResult | null) {

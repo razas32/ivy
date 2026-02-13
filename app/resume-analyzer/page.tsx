@@ -1,16 +1,16 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Sidebar from '@/components/Sidebar';
 import IvyGradient from '@/components/IvyGradient';
 import { Course, ResumeAnalysisReport } from '@/types';
-import { loadFromStorage, saveToStorage, STORAGE_KEYS } from '@/lib/storage';
 import { mockCourses } from '@/lib/mockData';
+import { fetchBootstrap, saveCareerAsset } from '@/lib/clientApi';
 
 type AnalysisStep = 'idle' | 'uploading' | 'parsing' | 'scoring' | 'recommendations' | 'done';
 
 export default function ResumeAnalyzer() {
-  const [courses] = useState<Course[]>(() => loadFromStorage<Course[]>(STORAGE_KEYS.courses, mockCourses));
+  const [courses, setCourses] = useState<Course[]>(mockCourses);
   const [file, setFile] = useState<File | null>(null);
   const [jobDescription, setJobDescription] = useState('');
   const [analysisStep, setAnalysisStep] = useState<AnalysisStep>('idle');
@@ -20,6 +20,17 @@ export default function ResumeAnalyzer() {
   const isAnalyzing = analysisStep !== 'idle' && analysisStep !== 'done';
 
   const canRun = !!file && !!jobDescription.trim() && !isAnalyzing;
+
+  useEffect(() => {
+    const run = async () => {
+      try {
+        const data = await fetchBootstrap();
+        setCourses(data.courses);
+      } catch (_error) {}
+    };
+
+    run();
+  }, []);
 
   const stepLabel = useMemo(() => {
     if (analysisStep === 'uploading') return 'Uploading resume...';
@@ -70,8 +81,11 @@ export default function ResumeAnalyzer() {
 
       setReport(nextReport);
 
-      const existing = loadFromStorage<ResumeAnalysisReport[]>(STORAGE_KEYS.careerReports, []);
-      saveToStorage(STORAGE_KEYS.careerReports, [nextReport, ...existing].slice(0, 20));
+      await saveCareerAsset({
+        type: 'resume_report',
+        title: `Resume Report ${new Date().toLocaleString()}`,
+        content: nextReport,
+      });
 
       setAnalysisStep('done');
     } catch (err) {
@@ -89,18 +103,18 @@ export default function ResumeAnalyzer() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-surface-50 via-white to-surface-100">
+    <div className="min-h-screen bg-gradient-to-br from-white via-white to-surface-100">
       <Sidebar courses={courses} />
 
       <main className="ml-64 pb-20">
-        <div className="max-w-7xl mx-auto p-8 space-y-8">
+        <div className="max-w-7xl mx-auto px-8 py-10 space-y-8">
           <IvyGradient className="rounded-3xl p-8 text-white border border-primary-500/30">
-            <h1 className="text-3xl font-bold">Resume Analyzer</h1>
+            <h1 className="text-3xl font-bold !text-white">Resume Analyzer</h1>
             <p className="text-white/90 mt-2">Upload PDF + job description for ATS match score and specific edits.</p>
           </IvyGradient>
 
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-            <div className="card p-6 space-y-4 border border-gray-200">
+            <div className="card p-7 space-y-4 border border-gray-200/80">
               <h2 className="text-xl font-semibold text-gray-900">Inputs</h2>
 
               <div className="space-y-2">
@@ -140,7 +154,7 @@ export default function ResumeAnalyzer() {
               </div>
             </div>
 
-            <div className="card p-6 space-y-4 border border-gray-200">
+            <div className="card p-7 space-y-4 border border-gray-200/80">
               <div className="flex items-center justify-between">
                 <h2 className="text-xl font-semibold text-gray-900">Report</h2>
                 {report && (

@@ -1,24 +1,60 @@
+import MarkdownContent from './MarkdownContent';
+
 interface MessageBubbleProps {
+  id?: string;
   role: 'user' | 'assistant';
   content: string;
   file?: string;
+  canRegenerate?: boolean;
+  copied?: boolean;
+  onCopy?: (messageId: string, content: string) => void;
+  onRegenerate?: (messageId: string) => void;
 }
 
-export default function MessageBubble({ role, content, file }: MessageBubbleProps) {
+export default function MessageBubble({
+  id,
+  role,
+  content,
+  file,
+  canRegenerate = false,
+  copied = false,
+  onCopy,
+  onRegenerate,
+}: MessageBubbleProps) {
   if (role === 'assistant') {
     return (
       <div className="flex items-start gap-3 mb-4">
         <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary-100 flex items-center justify-center">
           <svg className="w-5 h-5 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v2m0 14v2m9-9h-2M5 12H3m13.657-6.657l-1.414 1.414M8.757 15.243l-1.414 1.414m9.9 0-1.414-1.414M8.757 8.757 7.343 7.343M9 9h6v6H9V9z" />
           </svg>
         </div>
         <div className="flex-1">
           <div className="flex items-center gap-2 mb-1">
             <span className="text-sm font-semibold text-primary-600">Ivy</span>
+            <div className="ml-auto flex items-center gap-2">
+              {onCopy && id ? (
+                <button
+                  type="button"
+                  onClick={() => onCopy(id, content)}
+                  className="text-xs px-2 py-1 rounded-md border border-gray-200 text-gray-600 hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+                >
+                  {copied ? 'Copied' : 'Copy'}
+                </button>
+              ) : null}
+              {onRegenerate && id && canRegenerate ? (
+                <button
+                  type="button"
+                  onClick={() => onRegenerate(id)}
+                  className="text-xs px-2 py-1 rounded-md border border-gray-200 text-gray-600 hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+                >
+                  Regenerate
+                </button>
+              ) : null}
+            </div>
           </div>
           <div className="bg-white border border-gray-200 rounded-2xl rounded-tl-sm px-4 py-3 shadow-sm">
-            <p className="text-gray-900 text-sm leading-relaxed">{content}</p>
+            <MarkdownContent content={content} className="text-sm leading-relaxed text-gray-900" />
           </div>
         </div>
       </div>
@@ -37,7 +73,7 @@ export default function MessageBubble({ role, content, file }: MessageBubbleProp
           </div>
         )}
         {content && (
-          <div className="bg-primary-600 rounded-2xl rounded-tr-sm px-4 py-3 shadow-sm max-w-2xl">
+          <div className="bg-primary-100 border border-primary-200 rounded-2xl rounded-tr-sm px-4 py-3 shadow-sm max-w-2xl">
             <p className="text-gray-900 text-sm leading-relaxed">{content}</p>
           </div>
         )}

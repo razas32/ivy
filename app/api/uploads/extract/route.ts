@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { extractTextFromUpload } from '@/lib/fileTextExtraction';
+import { requireAuthenticatedUser } from '@/lib/server/auth';
 
 export async function POST(req: NextRequest) {
+  const { errorResponse } = await requireAuthenticatedUser(req);
+  if (errorResponse) return errorResponse;
+
   try {
     const formData = await req.formData();
     const file = formData.get('file');

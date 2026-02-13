@@ -5,10 +5,10 @@ import { useRouter } from 'next/navigation';
 import Sidebar from '@/components/Sidebar';
 import { Course, Deadline, Task } from '@/types';
 import { mockCourses, mockDeadlines, mockTasks } from '@/lib/mockData';
-import { loadFromStorage, saveToStorage, STORAGE_KEYS } from '@/lib/storage';
 import { generateId } from '@/lib/utils';
 import { formatDeadlineDisplay, getDeadlineStatus, formatAbsoluteDeadlineDate } from '@/lib/deadlineUtils';
 import { getCourseStatus, getStatusColorClass, getStatusBgClass } from '@/lib/courseStatusUtils';
+import { createDeadline, createTask, fetchBootstrap, updateTask } from '@/lib/clientApi';
 
 export default function CourseDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
@@ -18,6 +18,7 @@ export default function CourseDetailPage({ params }: { params: Promise<{ id: str
   const [allDeadlines, setAllDeadlines] = useState<Deadline[]>(mockDeadlines);
   const [isLoading, setIsLoading] = useState(true);
   const [isHydrated, setIsHydrated] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [isAddingDeadline, setIsAddingDeadline] = useState(false);
   const [newDeadline, setNewDeadline] = useState({
     title: '',
@@ -36,19 +37,23 @@ export default function CourseDetailPage({ params }: { params: Promise<{ id: str
   const [subtaskDrafts, setSubtaskDrafts] = useState<Record<string, string>>({});
 
   useEffect(() => {
-    params.then((p) => {
+    const run = async () => {
+      const p = await params;
       setCourseId(p.id);
 
-      const storedCourses = loadFromStorage<Course[]>(STORAGE_KEYS.courses, mockCourses);
-      const storedTasks = loadFromStorage<Task[]>(STORAGE_KEYS.tasks, mockTasks);
-      const storedDeadlines = loadFromStorage<Deadline[]>(STORAGE_KEYS.deadlines, mockDeadlines);
+      try {
+        const data = await fetchBootstrap();
+        setCourses(data.courses);
+        setAllTasks(data.tasks);
+        setAllDeadlines(data.deadlines);
+      } catch (_error) {
+      } finally {
+        setIsHydrated(true);
+        setIsLoading(false);
+      }
+    };
 
-      setCourses(storedCourses);
-      setAllTasks(storedTasks);
-      setAllDeadlines(storedDeadlines);
-      setIsHydrated(true);
-      setIsLoading(false);
-    });
+    run();
   }, [params]);
 
   useEffect(() => {
@@ -86,21 +91,6 @@ export default function CourseDetailPage({ params }: { params: Promise<{ id: str
     });
   }, [allTasks, courseId, isHydrated]);
 
-  useEffect(() => {
-    if (!isHydrated) return;
-    saveToStorage(STORAGE_KEYS.courses, courses);
-  }, [courses, isHydrated]);
-
-  useEffect(() => {
-    if (!isHydrated) return;
-    saveToStorage(STORAGE_KEYS.tasks, allTasks);
-  }, [allTasks, isHydrated]);
-
-  useEffect(() => {
-    if (!isHydrated) return;
-    saveToStorage(STORAGE_KEYS.deadlines, allDeadlines);
-  }, [allDeadlines, isHydrated]);
-
   const course = useMemo(
     () => courses.find((c) => c.id === courseId) || null,
     [courses, courseId]
@@ -129,18 +119,6 @@ export default function CourseDetailPage({ params }: { params: Promise<{ id: str
     [allDeadlines, courseId]
   );
 
-  const getCourseColorClass = (color: string) => {
-    const colorMap: Record<string, string> = {
-      blue: 'bg-course-blue border-course-blue',
-      purple: 'bg-course-purple border-course-purple',
-      green: 'bg-course-green border-course-green',
-      orange: 'bg-course-orange border-course-orange',
-      red: 'bg-course-red border-course-red',
-      pink: 'bg-course-pink border-course-pink',
-    };
-    return colorMap[color] || 'bg-gray-500 border-gray-500';
-  };
-
   const getProgressBarColor = (color: string) => {
     const colorMap: Record<string, string> = {
       blue: '#3b82f6',
@@ -151,18 +129,6 @@ export default function CourseDetailPage({ params }: { params: Promise<{ id: str
       pink: '#ec4899',
     };
     return colorMap[color] || '#6b7280';
-  };
-
-  const getBgColorClass = (color: string) => {
-    const colorMap: Record<string, string> = {
-      blue: 'bg-course-blue',
-      purple: 'bg-course-purple',
-      green: 'bg-course-green',
-      orange: 'bg-course-orange',
-      red: 'bg-course-red',
-      pink: 'bg-course-pink',
-    };
-    return colorMap[color] || 'bg-gray-500';
   };
 
   const getTextColorClass = (color: string) => {
@@ -201,7 +167,7 @@ export default function CourseDetailPage({ params }: { params: Promise<{ id: str
     return gradientMap[color] || 'bg-gradient-to-br from-gray-500 to-gray-700';
   };
 
-  const handleAddTask = () => {
+  const handleAddTask = async () => {
     if (!newTask.title.trim() || !courseId) return;
 
     const task: Task = {
@@ -217,26 +183,41 @@ export default function CourseDetailPage({ params }: { params: Promise<{ id: str
       category: newTask.category.trim() || null,
     };
 
-    setAllTasks((prev) => [...prev, task]);
-    setNewTask({
-      title: '',
-      dueDate: '',
-      priority: 'medium',
-      description: '',
-      category: '',
-    });
-    setIsAddingTask(false);
+    try {
+      await createTask(task);
+      setAllTasks((prev) => [...prev, task]);
+      setNewTask({
+        title: '',
+        dueDate: '',
+        priority: 'medium',
+        description: '',
+        category: '',
+      });
+      setIsAddingTask(false);
+      setActionError(null);
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : 'Action failed.');
+    }
   };
 
-  const handleToggleTask = (taskId: string) => {
-    setAllTasks((prev) =>
-      prev.map((task) =>
-        task.id === taskId ? { ...task, completed: !task.completed } : task
-      )
-    );
+  const handleToggleTask = async (taskId: string) => {
+    const existing = allTasks.find((task) => task.id === taskId);
+    if (!existing) return;
+    const nextCompleted = !existing.completed;
+    try {
+      await updateTask(taskId, { completed: nextCompleted });
+      setAllTasks((prev) =>
+        prev.map((task) =>
+          task.id === taskId ? { ...task, completed: nextCompleted } : task
+        )
+      );
+      setActionError(null);
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : 'Action failed.');
+    }
   };
 
-  const handleAddSubtask = (parentTaskId: string) => {
+  const handleAddSubtask = async (parentTaskId: string) => {
     const title = (subtaskDrafts[parentTaskId] || '').trim();
     if (!title || !courseId) return;
 
@@ -253,11 +234,17 @@ export default function CourseDetailPage({ params }: { params: Promise<{ id: str
       category: 'Subtask',
     };
 
-    setAllTasks((prev) => [...prev, subtask]);
-    setSubtaskDrafts((prev) => ({ ...prev, [parentTaskId]: '' }));
+    try {
+      await createTask(subtask);
+      setAllTasks((prev) => [...prev, subtask]);
+      setSubtaskDrafts((prev) => ({ ...prev, [parentTaskId]: '' }));
+      setActionError(null);
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : 'Action failed.');
+    }
   };
 
-  const handleAddDeadline = () => {
+  const handleAddDeadline = async () => {
     if (!newDeadline.title.trim() || !newDeadline.dueDate.trim() || !courseId) return;
 
     const deadline: Deadline = {
@@ -269,14 +256,20 @@ export default function CourseDetailPage({ params }: { params: Promise<{ id: str
       description: newDeadline.description.trim() || null,
     };
 
-    setAllDeadlines((prev) => [...prev, deadline]);
-    setNewDeadline({
-      title: '',
-      dueDate: '',
-      priority: 'medium',
-      description: '',
-    });
-    setIsAddingDeadline(false);
+    try {
+      await createDeadline(deadline);
+      setAllDeadlines((prev) => [...prev, deadline]);
+      setNewDeadline({
+        title: '',
+        dueDate: '',
+        priority: 'medium',
+        description: '',
+      });
+      setIsAddingDeadline(false);
+      setActionError(null);
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : 'Action failed.');
+    }
   };
 
   const getPriorityColor = (priority: string) => {
@@ -290,7 +283,7 @@ export default function CourseDetailPage({ params }: { params: Promise<{ id: str
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-surface-50">
+      <div className="min-h-screen">
         <Sidebar courses={courses} />
         <main className="ml-64">
           <div className="max-w-7xl mx-auto p-8">
@@ -305,7 +298,7 @@ export default function CourseDetailPage({ params }: { params: Promise<{ id: str
 
   if (!course) {
     return (
-      <div className="min-h-screen bg-surface-50">
+      <div className="min-h-screen">
         <Sidebar courses={courses} />
         <main className="ml-64">
           <div className="max-w-7xl mx-auto p-8">
@@ -345,11 +338,16 @@ export default function CourseDetailPage({ params }: { params: Promise<{ id: str
     : upcomingDeadline?.title || closestDeadline?.title || 'Add your first deadline';
 
   return (
-    <div className="min-h-screen bg-surface-50">
+    <div className="min-h-screen">
       <Sidebar courses={courses} />
       <main className="ml-64">
         <div className="max-w-7xl mx-auto p-8 space-y-6">
           {/* Header */}
+          {actionError && (
+            <div className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+              {actionError}
+            </div>
+          )}
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
             <div className="flex items-center gap-4">
               <div className={`w-16 h-16 rounded-2xl ${getBadgeGradientClass(course.color)} flex items-center justify-center shadow-inner`}>
@@ -466,7 +464,7 @@ export default function CourseDetailPage({ params }: { params: Promise<{ id: str
                           value={newDeadline.title}
                           onChange={(e) => setNewDeadline({ ...newDeadline, title: e.target.value })}
                           placeholder="e.g., Final Exam, Project Due"
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                         />
                       </div>
                       <div>
@@ -476,7 +474,7 @@ export default function CourseDetailPage({ params }: { params: Promise<{ id: str
                           value={newDeadline.dueDate}
                           onChange={(e) => setNewDeadline({ ...newDeadline, dueDate: e.target.value })}
                           placeholder="e.g., Mon. Nov. 24 @ 9:00am or 2024-11-24"
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                         />
                       </div>
                       <div>
@@ -484,7 +482,7 @@ export default function CourseDetailPage({ params }: { params: Promise<{ id: str
                         <select
                           value={newDeadline.priority}
                           onChange={(e) => setNewDeadline({ ...newDeadline, priority: e.target.value as 'low' | 'medium' | 'high' })}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                         >
                           <option value="low">Low</option>
                           <option value="medium">Medium</option>
@@ -498,7 +496,7 @@ export default function CourseDetailPage({ params }: { params: Promise<{ id: str
                           onChange={(e) => setNewDeadline({ ...newDeadline, description: e.target.value })}
                           placeholder="Additional details about this deadline..."
                           rows={2}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                         />
                       </div>
                       <div className="flex gap-2 pt-2">
@@ -591,7 +589,7 @@ export default function CourseDetailPage({ params }: { params: Promise<{ id: str
                           value={newTask.title}
                           onChange={(e) => setNewTask({ ...newTask, title: e.target.value })}
                           placeholder="e.g., Complete assignment, Study for exam"
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                         />
                       </div>
                       <div>
@@ -601,7 +599,7 @@ export default function CourseDetailPage({ params }: { params: Promise<{ id: str
                           value={newTask.dueDate}
                           onChange={(e) => setNewTask({ ...newTask, dueDate: e.target.value })}
                           placeholder="e.g., Mon. Nov. 24 @ 9:00am or 2024-11-24"
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                         />
                       </div>
                       <div>
@@ -609,7 +607,7 @@ export default function CourseDetailPage({ params }: { params: Promise<{ id: str
                         <select
                           value={newTask.priority}
                           onChange={(e) => setNewTask({ ...newTask, priority: e.target.value as 'low' | 'medium' | 'high' })}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                         >
                           <option value="low">Low</option>
                           <option value="medium">Medium</option>
@@ -623,7 +621,7 @@ export default function CourseDetailPage({ params }: { params: Promise<{ id: str
                           value={newTask.category}
                           onChange={(e) => setNewTask({ ...newTask, category: e.target.value })}
                           placeholder="e.g., Homework, Reading, Lab"
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                         />
                       </div>
                       <div>
@@ -633,7 +631,7 @@ export default function CourseDetailPage({ params }: { params: Promise<{ id: str
                           onChange={(e) => setNewTask({ ...newTask, description: e.target.value })}
                           placeholder="Additional details about this task..."
                           rows={2}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                         />
                       </div>
                       <div className="flex gap-2 pt-2">

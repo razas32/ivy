@@ -3,7 +3,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Sidebar from '@/components/Sidebar';
+import { Course } from '@/types';
 import { mockCourses } from '@/lib/mockData';
+import { fetchBootstrap } from '@/lib/clientApi';
 
 type TimerMode = 'pomodoro' | 'shortBreak' | 'longBreak';
 
@@ -16,6 +18,7 @@ interface PomodoroSettings {
 
 export default function PomodoroPage() {
   const router = useRouter();
+  const [courses, setCourses] = useState<Course[]>(mockCourses);
   const [mode, setMode] = useState<TimerMode>('pomodoro');
   const [timeLeft, setTimeLeft] = useState(25 * 60); // 25 minutes in seconds
   const [isRunning, setIsRunning] = useState(false);
@@ -30,6 +33,17 @@ export default function PomodoroPage() {
   });
 
   const [showSettings, setShowSettings] = useState(false);
+
+  useEffect(() => {
+    const run = async () => {
+      try {
+        const data = await fetchBootstrap();
+        setCourses(data.courses);
+      } catch (_error) {}
+    };
+
+    run();
+  }, []);
 
   useEffect(() => {
     if (isRunning && timeLeft > 0) {
@@ -158,8 +172,8 @@ export default function PomodoroPage() {
   };
 
   return (
-    <div className="min-h-screen bg-surface-50">
-      <Sidebar courses={mockCourses} />
+    <div className="min-h-screen">
+      <Sidebar courses={courses} />
 
       <main className="ml-64">
         <div className="max-w-4xl mx-auto p-8">

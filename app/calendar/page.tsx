@@ -1,12 +1,13 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import { useEffect } from 'react';
 import Link from 'next/link';
 import Sidebar from '@/components/Sidebar';
 import { Course, Deadline, Task } from '@/types';
-import { loadFromStorage, STORAGE_KEYS } from '@/lib/storage';
 import { mockCourses, mockDeadlines, mockTasks } from '@/lib/mockData';
 import { parseFlexibleDate } from '@/lib/deadlineUtils';
+import { fetchBootstrap } from '@/lib/clientApi';
 
 type ViewMode = 'month' | 'week';
 
@@ -20,10 +21,23 @@ interface CalendarItem {
 }
 
 export default function CalendarPage() {
-  const [courses] = useState<Course[]>(() => loadFromStorage(STORAGE_KEYS.courses, mockCourses));
-  const [tasks] = useState<Task[]>(() => loadFromStorage(STORAGE_KEYS.tasks, mockTasks));
-  const [deadlines] = useState<Deadline[]>(() => loadFromStorage(STORAGE_KEYS.deadlines, mockDeadlines));
+  const [courses, setCourses] = useState<Course[]>(mockCourses);
+  const [tasks, setTasks] = useState<Task[]>(mockTasks);
+  const [deadlines, setDeadlines] = useState<Deadline[]>(mockDeadlines);
   const [viewMode, setViewMode] = useState<ViewMode>('month');
+
+  useEffect(() => {
+    const run = async () => {
+      try {
+        const data = await fetchBootstrap();
+        setCourses(data.courses);
+        setTasks(data.tasks);
+        setDeadlines(data.deadlines);
+      } catch (_error) {}
+    };
+
+    run();
+  }, []);
 
   const courseById = useMemo(() => new Map(courses.map((c) => [c.id, c])), [courses]);
 
@@ -84,18 +98,18 @@ export default function CalendarPage() {
   }, {});
 
   return (
-    <div className="min-h-screen bg-surface-50">
+    <div className="min-h-screen">
       <Sidebar courses={courses} />
 
       <main className="ml-64 pb-20">
-        <div className="max-w-7xl mx-auto p-8 space-y-6">
+        <div className="max-w-7xl mx-auto px-8 py-10 space-y-8">
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-3xl font-bold text-gray-900">Calendar</h1>
               <p className="text-sm text-gray-600">Tasks and deadlines in one timeline.</p>
             </div>
 
-            <div className="flex rounded-lg border border-gray-300 overflow-hidden">
+            <div className="flex rounded-xl border border-gray-300 overflow-hidden bg-white/85">
               <button
                 onClick={() => setViewMode('month')}
                 className={`px-4 py-2 text-sm font-medium ${viewMode === 'month' ? 'bg-primary-50 text-primary-700' : 'bg-white text-gray-700'}`}

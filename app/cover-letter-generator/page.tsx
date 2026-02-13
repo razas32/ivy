@@ -1,12 +1,12 @@
 'use client';
 
 import { useState } from 'react';
+import { useEffect } from 'react';
 import Sidebar from '@/components/Sidebar';
 import IvyGradient from '@/components/IvyGradient';
-import { CoverLetterGenerationResult, Course, GeneratedAsset } from '@/types';
-import { generateId } from '@/lib/utils';
-import { loadFromStorage, saveToStorage, STORAGE_KEYS } from '@/lib/storage';
+import { CoverLetterGenerationResult, Course } from '@/types';
 import { mockCourses } from '@/lib/mockData';
+import { fetchBootstrap, saveCareerAsset } from '@/lib/clientApi';
 
 const tonePresets = [
   'confident and concise',
@@ -16,13 +16,24 @@ const tonePresets = [
 ];
 
 export default function CoverLetterGenerator() {
-  const [courses] = useState<Course[]>(() => loadFromStorage<Course[]>(STORAGE_KEYS.courses, mockCourses));
+  const [courses, setCourses] = useState<Course[]>(mockCourses);
   const [jobDescription, setJobDescription] = useState('');
   const [resumeSummary, setResumeSummary] = useState('');
   const [tone, setTone] = useState(tonePresets[0]);
   const [result, setResult] = useState<CoverLetterGenerationResult | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const run = async () => {
+      try {
+        const data = await fetchBootstrap();
+        setCourses(data.courses);
+      } catch (_error) {}
+    };
+
+    run();
+  }, []);
 
   const generate = async () => {
     if (!jobDescription.trim() || !resumeSummary.trim()) return;
@@ -55,16 +66,11 @@ export default function CoverLetterGenerator() {
 
       setResult(payload);
 
-      const existing = loadFromStorage<GeneratedAsset[]>(STORAGE_KEYS.generatedAssets, []);
-      const asset: GeneratedAsset = {
-        id: generateId(),
+      await saveCareerAsset({
         type: 'cover_letter',
         title: `Cover Letter ${new Date().toLocaleString()}`,
-        createdAt: new Date().toISOString(),
-        content: payload.draft,
-      };
-
-      saveToStorage(STORAGE_KEYS.generatedAssets, [asset, ...existing].slice(0, 30));
+        content: payload,
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unexpected error.');
     } finally {
@@ -78,18 +84,18 @@ export default function CoverLetterGenerator() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-surface-50 via-white to-surface-100">
+    <div className="min-h-screen bg-gradient-to-br from-white via-white to-surface-100">
       <Sidebar courses={courses} />
 
       <main className="ml-64 pb-24">
-        <div className="max-w-7xl mx-auto p-8 space-y-8">
+        <div className="max-w-7xl mx-auto px-8 py-10 space-y-8">
           <IvyGradient className="rounded-3xl p-8 text-white border border-primary-500/30">
-            <h1 className="text-3xl font-bold">Cover Letter Generator</h1>
+            <h1 className="text-3xl font-bold !text-white">Cover Letter Generator</h1>
             <p className="text-white/90 mt-2">Generate a 300-400 word ATS-friendly draft from JD + resume summary.</p>
           </IvyGradient>
 
           <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-            <div className="card p-6 border border-gray-200 xl:col-span-2 space-y-3">
+            <div className="card p-7 border border-gray-200/80 xl:col-span-2 space-y-3">
               <h2 className="text-lg font-semibold text-gray-900">Job Description</h2>
               <textarea
                 value={jobDescription}
@@ -99,7 +105,7 @@ export default function CoverLetterGenerator() {
               />
             </div>
 
-            <div className="card p-6 border border-gray-200 space-y-3">
+            <div className="card p-7 border border-gray-200/80 space-y-3">
               <h2 className="text-lg font-semibold text-gray-900">Resume Summary</h2>
               <textarea
                 value={resumeSummary}

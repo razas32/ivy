@@ -27,7 +27,11 @@ export async function extractTextFromUpload(file: UploadFileLike): Promise<strin
   }
 
   if (type === 'application/pdf' || name.endsWith('.pdf')) {
-    const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs');
+    const [pdfjs, pdfjsWorker] = await Promise.all([
+      import('pdfjs-dist/legacy/build/pdf.mjs'),
+      import('pdfjs-dist/legacy/build/pdf.worker.mjs'),
+    ]);
+    (globalThis as any).pdfjsWorker = pdfjsWorker;
     const buffer = await file.arrayBuffer();
     const loadingTask = pdfjs.getDocument({
       data: buffer,

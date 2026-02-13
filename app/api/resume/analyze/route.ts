@@ -4,6 +4,7 @@ import { checkRateLimit } from '@/lib/rateLimiter';
 import { extractTextFromUpload } from '@/lib/fileTextExtraction';
 import { runResumeKeywordAnalysis } from '@/lib/resumeAnalyzer';
 import { stripHtml } from '@/lib/textUtils';
+import { requireAuthenticatedUser } from '@/lib/server/auth';
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
@@ -55,6 +56,9 @@ async function getRecommendations(jobDescription: string, resumeText: string, mi
 }
 
 export async function POST(req: NextRequest) {
+  const { errorResponse } = await requireAuthenticatedUser(req);
+  if (errorResponse) return errorResponse;
+
   const startedAt = Date.now();
   const rateKey = `resume:${getClientKey(req)}`;
   const rate = checkRateLimit(rateKey, 5, 60_000);

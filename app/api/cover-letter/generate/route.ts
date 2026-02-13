@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
 import { checkRateLimit } from '@/lib/rateLimiter';
 import { stripHtml } from '@/lib/textUtils';
+import { requireAuthenticatedUser } from '@/lib/server/auth';
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
@@ -57,6 +58,9 @@ function fallbackDraft(jobDescription: string, resumeSummary: string) {
 }
 
 export async function POST(req: NextRequest) {
+  const { errorResponse } = await requireAuthenticatedUser(req);
+  if (errorResponse) return errorResponse;
+
   const rateKey = `cover-letter:${getClientKey(req)}`;
   const rate = checkRateLimit(rateKey, 5, 60_000);
 
