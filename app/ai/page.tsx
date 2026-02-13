@@ -86,7 +86,7 @@ export default function AIWorkspacePage() {
 
   const handleAssistantStructuredData = async (data: CourseExtractionResult) => {
     if (!data?.courses || data.courses.length === 0) {
-      return;
+      return { createdCourses: [] };
     }
 
     const newCourses: Course[] = [];
@@ -148,9 +148,18 @@ export default function AIWorkspacePage() {
         await Promise.all(newDeadlines.map((deadline) => createDeadline(deadline)));
       }
       setLoadError(null);
+
+      return {
+        createdCourses: newCourses.map((course) => ({
+          id: course.id,
+          code: course.code,
+          name: course.name,
+        })),
+      };
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Action failed.';
       setLoadError(message);
+      return { createdCourses: [] };
     }
   };
 

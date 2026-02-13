@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import MessageBubble from './MessageBubble';
 import MarkdownContent from './MarkdownContent';
@@ -8,8 +9,14 @@ import QuizView from './QuizView';
 import TypingIndicator from './TypingIndicator';
 import { CourseExtractionResult, Flashcard, QuizQuestion } from '@/types';
 
+type CreatedCourse = {
+  id: string;
+  code: string;
+  name: string;
+};
+
 interface StudyAssistantProps {
-  onStructuredData?: (data: CourseExtractionResult) => void | Promise<void>;
+  onStructuredData?: (data: CourseExtractionResult) => void | { createdCourses?: CreatedCourse[] } | Promise<void | { createdCourses?: CreatedCourse[] }>;
   flashcards: Flashcard[];
   quizQuestions: QuizQuestion[];
   onFlashcardsGenerated?: (cards: Flashcard[]) => void | Promise<void>;
@@ -18,11 +25,17 @@ interface StudyAssistantProps {
   immersive?: boolean;
 }
 
+interface MessageAction {
+  label: string;
+  href: string;
+}
+
 interface Message {
   id: string;
   role: 'user' | 'assistant';
   content: string;
   file?: string;
+  actions?: MessageAction[];
 }
 
 type TabType = 'chat' | 'flashcards' | 'quizzes';
@@ -75,6 +88,7 @@ export default function StudyAssistant({
   const chatScrollRef = useRef<HTMLDivElement | null>(null);
   const requestAbortRef = useRef<AbortController | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const quickActionsRef = useRef<HTMLDivElement | null>(null);
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -189,6 +203,13 @@ export default function StudyAssistant({
     setShouldAutoScroll(distanceToBottom < 80);
   };
 
+  const scrollQuickActions = (direction: 'left' | 'right') => {
+    const container = quickActionsRef.current;
+    if (!container) return;
+    const delta = direction === 'left' ? -260 : 260;
+    container.scrollBy({ left: delta, behavior: 'smooth' });
+  };
+
   const requestChat = async (
     payload: ChatPayload,
     options?: { onDelta?: (chunk: string) => void; signal?: AbortSignal }
@@ -267,20 +288,27 @@ export default function StudyAssistant({
     return data;
   };
 
-  const applyGeneratedData = (data: ChatResponse, requestGenerationType: GenerationType) => {
+  const applyGeneratedData = async (data: ChatResponse, requestGenerationType: GenerationType) => {
+    let createdCourses: CreatedCourse[] = [];
+
     if (data.structuredData) {
-      onStructuredData?.(data.structuredData);
+      const structuredResult = await onStructuredData?.(data.structuredData);
+      if (structuredResult && 'createdCourses' in structuredResult) {
+        createdCourses = structuredResult.createdCourses || [];
+      }
     }
 
     if (requestGenerationType === 'flashcards' && data.flashcards?.length) {
-      onFlashcardsGenerated?.(data.flashcards);
+      await onFlashcardsGenerated?.(data.flashcards);
       setActiveTab('flashcards');
     }
 
     if (requestGenerationType === 'quiz' && data.quizQuestions?.length) {
-      onQuizGenerated?.(data.quizQuestions);
+      await onQuizGenerated?.(data.quizQuestions);
       setActiveTab('quizzes');
     }
+
+    return { createdCourses };
   };
 
   const createErrorMessage = (error: unknown): Message => ({
@@ -352,20 +380,29 @@ export default function StudyAssistant({
         signal: controller.signal,
       });
 
+      const generatedData = await applyGeneratedData(data, requestGenerationType);
+
       if (requestGenerationType === 'chat') {
         updateAssistantContent(
           assistantId,
           data.message?.trim() || 'I ran into an issue and could not generate a response.'
         );
       } else {
+        const actionButtons = requestGenerationType === 'course'
+          ? generatedData.createdCourses.map((course) => ({
+              label: `Go to ${course.code}`,
+              href: `/courses/${course.id}`,
+            }))
+          : undefined;
+
         const aiMessage: Message = {
           id: assistantId,
           role: 'assistant',
           content: data.message || 'I ran into an issue and could not generate a response.',
+          actions: actionButtons,
         };
         setMessages(prev => [...prev, aiMessage]);
       }
-      applyGeneratedData(data, requestGenerationType);
     } catch (error) {
       console.error('Chat error:', error);
       removeTrailingEmptyAssistant();
@@ -418,20 +455,29 @@ export default function StudyAssistant({
         signal: controller.signal,
       });
 
+      const generatedData = await applyGeneratedData(data, lastPayload.generationType);
+
       if (lastPayload.generationType === 'chat') {
         updateAssistantContent(
           regeneratedId,
           data.message?.trim() || 'I ran into an issue and could not regenerate a response.'
         );
       } else {
+        const actionButtons = lastPayload.generationType === 'course'
+          ? generatedData.createdCourses.map((course) => ({
+              label: `Go to ${course.code}`,
+              href: `/courses/${course.id}`,
+            }))
+          : undefined;
+
         const regeneratedMessage: Message = {
           id: regeneratedId,
           role: 'assistant',
           content: data.message || 'I ran into an issue and could not regenerate a response.',
+          actions: actionButtons,
         };
         setMessages(prev => [...prev, regeneratedMessage]);
       }
-      applyGeneratedData(data, lastPayload.generationType);
     } catch (error) {
       console.error('Regeneration error:', error);
       removeTrailingEmptyAssistant();
@@ -472,12 +518,57 @@ export default function StudyAssistant({
     return data.text || '';
   };
 
-  const quickActions: { icon: string; label: string; prompt: string; type: GenerationType; tab: TabType }[] = [
-    { icon: '💬', label: 'Ask Ivy', prompt: 'Explain this topic in simple terms.', type: 'chat', tab: 'chat' },
-    { icon: '📝', label: 'Ingest Outline', prompt: 'Extract courses, deadlines, and tasks from this outline.', type: 'course', tab: 'chat' },
-    { icon: '🎴', label: 'Create Flashcards', prompt: 'Create concise flashcards for key concepts.', type: 'flashcards', tab: 'flashcards' },
-    { icon: '📊', label: 'Generate Quiz', prompt: 'Generate 8 quiz questions (mix true/false and fill-in-the-blank) with answers.', type: 'quiz', tab: 'quizzes' },
+  type QuickActionIcon =
+    | 'chat'
+    | 'ingest'
+    | 'flashcards'
+    | 'quiz'
+    | 'summary'
+    | 'plan'
+    | 'explain'
+    | 'topics'
+    | 'practice'
+    | 'checklist';
+
+  const quickActions: { icon: QuickActionIcon; label: string; prompt: string; type: GenerationType; tab: TabType }[] = [
+    { icon: 'chat', label: 'Ask Ivy', prompt: 'Explain this topic in simple terms.', type: 'chat', tab: 'chat' },
+    { icon: 'ingest', label: 'Ingest Outline', prompt: 'Extract courses, deadlines, and tasks from this outline.', type: 'course', tab: 'chat' },
+    { icon: 'flashcards', label: 'Create Flashcards', prompt: 'Create concise flashcards for key concepts.', type: 'flashcards', tab: 'flashcards' },
+    { icon: 'quiz', label: 'Generate Quiz', prompt: 'Generate 8 quiz questions (mix true/false and fill-in-the-blank) with answers.', type: 'quiz', tab: 'quizzes' },
+    { icon: 'summary', label: 'Summarize Notes', prompt: 'Summarize these notes into a concise study summary with key takeaways.', type: 'chat', tab: 'chat' },
+    { icon: 'plan', label: 'Study Plan', prompt: 'Create a 7-day study plan from this material with daily milestones.', type: 'chat', tab: 'chat' },
+    { icon: 'explain', label: 'Explain Simply', prompt: 'Explain this like I am new to the topic, using plain language and examples.', type: 'chat', tab: 'chat' },
+    { icon: 'topics', label: 'Key Topics', prompt: 'List the most important topics I should focus on first.', type: 'chat', tab: 'chat' },
+    { icon: 'practice', label: 'Practice Qs', prompt: 'Generate practice questions based on this material and include answers.', type: 'chat', tab: 'chat' },
+    { icon: 'checklist', label: 'Study Checklist', prompt: 'Turn this material into a practical study checklist I can follow.', type: 'chat', tab: 'chat' },
   ];
+
+  const renderQuickActionIcon = (icon: QuickActionIcon) => {
+    switch (icon) {
+      case 'chat':
+        return <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h8m-8 4h5m7 2a9 9 0 10-18 0v4l-2 2h20l-2-2v-4z" />;
+      case 'ingest':
+        return <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 5h7l5 5v9a2 2 0 01-2 2H7a2 2 0 01-2-2V7a2 2 0 012-2zm7 0v5h5M9 13h6M9 17h6" />;
+      case 'flashcards':
+        return <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h11a2 2 0 012 2v7a2 2 0 01-2 2H7a2 2 0 01-2-2V9a2 2 0 012-2zm-2 3H4a2 2 0 00-2 2v7a2 2 0 002 2h11" />;
+      case 'quiz':
+        return <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.09 9a3 3 0 115.82 1c0 2-3 2-3 4m0 4h.01M12 3a9 9 0 100 18 9 9 0 000-18z" />;
+      case 'summary':
+        return <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 5h12M6 10h12M6 15h8M5 3h14a2 2 0 012 2v14l-3-2-3 2-3-2-3 2-3-2V5a2 2 0 012-2z" />;
+      case 'plan':
+        return <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3M5 11h14M6 5h12a2 2 0 012 2v12a2 2 0 01-2 2H6a2 2 0 01-2-2V7a2 2 0 012-2z" />;
+      case 'explain':
+        return <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6l4 2M12 3a9 9 0 100 18 9 9 0 000-18z" />;
+      case 'topics':
+        return <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3l2.5 5 5.5.8-4 3.9.9 5.5L12 16l-4.9 2.2.9-5.5-4-3.9 5.5-.8L12 3z" />;
+      case 'practice':
+        return <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h8M8 14h5m-5-9h8a2 2 0 012 2v10a2 2 0 01-2 2H8l-4 3V7a2 2 0 012-2z" />;
+      case 'checklist':
+        return <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 6h10M9 12h10M9 18h10M5 6l1.5 1.5L8 6m-3 6l1.5 1.5L8 12m-3 6l1.5 1.5L8 18" />;
+      default:
+        return null;
+    }
+  };
   const compactQuickActions = quickActions.filter(action => action.label !== 'Ask Ivy');
   const visibleQuickActions = immersive ? compactQuickActions : quickActions;
   const lastAssistantId = [...messages].reverse().find(msg => msg.role === 'assistant')?.id;
@@ -495,18 +586,18 @@ export default function StudyAssistant({
         {isDragging && (
           <div className={immersive ? 'absolute inset-0 bg-primary-50 bg-opacity-95 border-4 border-dashed border-primary-500 rounded-none flex items-center justify-center z-50 pointer-events-none' : 'absolute inset-0 bg-primary-50 bg-opacity-95 border-4 border-dashed border-primary-500 rounded-xl flex items-center justify-center z-50 pointer-events-none'}>
             <div className="text-center">
-              <svg className="w-16 h-16 text-primary-600 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-16 h-16 text-[var(--ivy-primary)] mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
               </svg>
               <p className="text-xl font-semibold text-primary-700">Drop your file here</p>
-              <p className="text-sm text-primary-600 mt-2">PDF or TXT up to 10MB</p>
+              <p className="text-sm text-[var(--ivy-primary)] mt-2">PDF or TXT up to 10MB</p>
             </div>
           </div>
         )}
         <div className={fullHeight ? 'border-b border-gray-200/80 bg-white/90 p-4' : 'border-b border-gray-200/80 bg-white/75 p-7'}>
           {showAssistantTitle && (
             <div className="flex items-center gap-2 mb-5">
-              <svg className="w-6 h-6 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-6 h-6 text-[var(--ivy-primary)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v2m0 14v2m9-9h-2M5 12H3m13.657-6.657l-1.414 1.414M8.757 15.243l-1.414 1.414m9.9 0-1.414-1.414M8.757 8.757 7.343 7.343M9 9h6v6H9V9z" />
               </svg>
               <h2 className="text-2xl font-bold text-gray-900">AI Study Assistant</h2>
@@ -519,9 +610,10 @@ export default function StudyAssistant({
                 setActiveTab('chat');
                 setGenerationType('chat');
               }}
+              style={activeTab === 'chat' ? { backgroundColor: 'var(--ivy-primary)' } : undefined}
               className={`flex-1 py-3 px-4 ${immersive ? 'rounded-xl' : 'rounded-xl'} font-semibold text-sm transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 ${
                 activeTab === 'chat'
-                  ? 'bg-ivy-gradient text-white shadow-sm'
+                  ? 'text-white shadow-sm'
                   : 'bg-gray-100/80 text-gray-700 hover:bg-gray-200/80'
               }`}
             >
@@ -533,9 +625,10 @@ export default function StudyAssistant({
                 setGenerationType('flashcards');
                 setPendingGeneration(null);
               }}
+              style={activeTab === 'flashcards' ? { backgroundColor: 'var(--ivy-primary)' } : undefined}
               className={`flex-1 py-3 px-4 ${immersive ? 'rounded-xl' : 'rounded-xl'} font-semibold text-sm transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 ${
                 activeTab === 'flashcards'
-                  ? 'bg-ivy-gradient text-white shadow-sm'
+                  ? 'text-white shadow-sm'
                   : 'bg-gray-100/80 text-gray-700 hover:bg-gray-200/80'
               }`}
             >
@@ -547,9 +640,10 @@ export default function StudyAssistant({
                 setGenerationType('quiz');
                 setPendingGeneration(null);
               }}
+              style={activeTab === 'quizzes' ? { backgroundColor: 'var(--ivy-primary)' } : undefined}
               className={`flex-1 py-3 px-4 ${immersive ? 'rounded-xl' : 'rounded-xl'} font-semibold text-sm transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 ${
                 activeTab === 'quizzes'
-                  ? 'bg-ivy-gradient text-white shadow-sm'
+                  ? 'text-white shadow-sm'
                   : 'bg-gray-100/80 text-gray-700 hover:bg-gray-200/80'
               }`}
             >
@@ -569,13 +663,13 @@ export default function StudyAssistant({
                 msg.role === 'assistant' ? (
                   <div key={msg.id} className="flex items-start gap-3 mb-4">
                     <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary-100 flex items-center justify-center">
-                      <svg className="w-5 h-5 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg className="w-5 h-5 text-[var(--ivy-primary)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v2m0 14v2m9-9h-2M5 12H3m13.657-6.657l-1.414 1.414M8.757 15.243l-1.414 1.414m9.9 0-1.414-1.414M8.757 8.757 7.343 7.343M9 9h6v6H9V9z" />
                       </svg>
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
-                        <span className="text-sm font-semibold text-primary-600">Ivy</span>
+                        <span className="text-sm font-semibold text-[var(--ivy-primary)]">Ivy</span>
                         <div className="ml-auto flex items-center gap-2">
                           {msg.content.trim().length > 0 ? (
                             <button
@@ -604,6 +698,22 @@ export default function StudyAssistant({
                           <div className="h-5" />
                         )}
                       </div>
+                      {msg.actions && msg.actions.length > 0 ? (
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          {msg.actions.map((action) => (
+                            <Link
+                              key={`${msg.id}-${action.href}`}
+                              href={action.href}
+                              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-ivy-gradient text-white text-xs font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2"
+                            >
+                              {action.label}
+                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                              </svg>
+                            </Link>
+                          ))}
+                        </div>
+                      ) : null}
                     </div>
                   </div>
                 ) : (
@@ -638,7 +748,7 @@ export default function StudyAssistant({
 
         <form
           onSubmit={handleSubmit}
-          className={fullHeight ? "border-t border-gray-200/80 bg-white/95 p-4" : "border-t border-gray-200/80 bg-white/90 p-6"}
+          className={fullHeight ? "border-t border-gray-200/80 bg-white/95 p-4 pb-6" : "border-t border-gray-200/80 bg-white/90 p-6"}
         >
           {file && (
             <div className={immersive ? 'mb-3 flex items-center gap-2 bg-gray-100 px-3 py-2 rounded-lg w-fit' : 'mb-3 flex items-center gap-2 bg-gray-100 px-3 py-2 rounded-lg w-fit'}>
@@ -718,24 +828,57 @@ export default function StudyAssistant({
           </div>
 
           {(immersive || (!fullHeight && !immersive)) && (
-            <div className="flex flex-wrap gap-2 mt-4">
-            {visibleQuickActions.map((action, index) => (
+            <div className="mt-4 flex items-center gap-2">
               <button
-                key={index}
                 type="button"
-                onClick={() => {
-                  setMessage(action.prompt);
-                  setGenerationType(action.type);
-                  setActiveTab(action.tab);
-                }}
-                className={immersive
-                  ? 'flex items-center gap-2 px-3 py-2 bg-white border border-gray-300 rounded-xl text-sm font-medium text-gray-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2'
-                  : 'flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2'}
+                onClick={() => scrollQuickActions('left')}
+                className="h-9 w-9 flex-shrink-0 inline-flex items-center justify-center rounded-xl border border-gray-300 bg-white text-gray-600 hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+                aria-label="Scroll quick actions left"
               >
-                <span>{action.icon}</span>
-                <span>{action.label}</span>
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
               </button>
-            ))}
+
+              <div
+                ref={quickActionsRef}
+                className="flex-1 overflow-x-auto whitespace-nowrap [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+              >
+                <div className="inline-flex gap-2 min-w-max pr-1">
+                  {visibleQuickActions.map((action, index) => (
+                    <button
+                      key={index}
+                      type="button"
+                      onClick={() => {
+                        setMessage(action.prompt);
+                        setGenerationType(action.type);
+                        setActiveTab(action.tab);
+                      }}
+                      className={immersive
+                        ? 'inline-flex items-center gap-2 px-3 py-2 bg-white border border-gray-300 rounded-xl text-sm font-medium text-gray-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2'
+                        : 'inline-flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2'}
+                    >
+                      <span className="inline-flex items-center justify-center w-4 h-4 text-[var(--ivy-primary)]">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          {renderQuickActionIcon(action.icon)}
+                        </svg>
+                      </span>
+                      <span>{action.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => scrollQuickActions('right')}
+                className="h-9 w-9 flex-shrink-0 inline-flex items-center justify-center rounded-xl border border-gray-300 bg-white text-gray-600 hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+                aria-label="Scroll quick actions right"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </button>
             </div>
           )}
         </form>
