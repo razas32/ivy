@@ -1,174 +1,124 @@
-# Ivy - AI Study Assistant
+# Ivy
 
-A modern, enterprise-grade web application built with Next.js 16 and React 19 that helps students manage their academic life with AI-powered study tools.
+Ivy is a student workspace built with Next.js that combines course planning, deadline tracking, and AI-assisted study workflows in one app.
 
-## Features
+The current product includes:
 
-### Dashboard
-- **Academic Overview**: Visual stats showing tasks completed, upcoming deadlines, and active courses
-- **Course Management**: Full CRUD operations for courses with color-coded organization
-- **Responsive Design**: Clean, modern UI following enterprise design principles
+- a dashboard with course, task, and deadline overview
+- an AI study assistant for chat, course extraction, flashcards, and quizzes
+- a calendar view for dated and TBD work
+- a resume analyzer for ATS keyword matching
+- a cover letter generator for job-specific drafts
+- lightweight auth plus Supabase-backed persistence
 
-### Course Management (CRUD)
-- **Create**: Add new courses with custom colors, deadlines, and task tracking
-- **Read**: View all courses in an organized grid layout with progress indicators
-- **Update**: Edit course details, colors, and schedules
-- **Delete**: Remove courses with confirmation dialog
+## Stack
 
-### AI Study Assistant (Chatbot)
-- **Collapsible Interface**: Fixed bottom position that expands on demand
-- **Multiple Modes**:
-  - Chat: Conversational AI assistance
-  - Flashcards: Generate study cards (placeholder)
-  - Quizzes: Create practice tests (placeholder)
-- **Quick Actions**: One-click buttons for common tasks
-- **Privacy-Focused**: Built with user privacy in mind
+- Next.js 16 App Router
+- React 19
+- TypeScript
+- Tailwind CSS 4
+- Supabase REST API
+- OpenAI API
 
-## Tech Stack
+## Product Areas
 
-- **Framework**: Next.js 16.0.1 with App Router
-- **UI Library**: React 19.2.0
-- **Styling**: Tailwind CSS 4.1.16
-- **Language**: TypeScript 5.9.3
-- **Build Tool**: Turbopack (Next.js default)
+### Academic workspace
 
-## Project Structure
+- create, edit, and delete courses
+- track tasks and deadlines
+- export tasks and deadlines as CSV
+- review workload in dashboard and calendar views
 
-```
-Ivy/
-├── app/
-│   ├── layout.tsx          # Root layout with fonts and metadata
-│   ├── page.tsx             # Main dashboard page
-│   └── globals.css          # Global styles and Tailwind directives
-├── components/
-│   ├── Sidebar.tsx          # Navigation sidebar with course list
-│   ├── StatsCard.tsx        # Reusable stats display component
-│   ├── CourseCard.tsx       # Individual course card with CRUD actions
-│   ├── CourseModal.tsx      # Modal for creating/editing courses
-│   └── ChatBot.tsx          # AI assistant interface
-├── lib/
-│   └── mockData.ts          # Mock data for courses and stats
-├── types/
-│   └── index.ts             # TypeScript type definitions
-└── public/                  # Static assets
-```
+### AI workspace
 
-## Design System
+- chat with uploaded PDF or text context
+- extract course structure from syllabi or notes and turn it into app data
+- generate flashcards from source material
+- generate quiz questions for self-testing
 
-### Colors
-- **Primary**: Green (#008050) - Main brand color
-- **Course Colors**: Blue, Purple, Green, Orange, Red, Pink
-- **Surface**: Light gray backgrounds for depth
-- **Text**: Gray scale for hierarchy
+### Career tools
 
-### Components
-- **Cards**: Elevated surfaces with hover effects
-- **Buttons**: Primary (green) and secondary (gray) variants
-- **Inputs**: Clean, focused states with ring effects
-- **Modal**: Centered overlay with backdrop blur
+- upload a resume PDF and compare it against a job description
+- generate prioritized resume edits
+- draft ATS-friendly cover letters with tone presets
 
-### Typography
-- **Font**: Inter (loaded from Google Fonts)
-- **Hierarchy**: Semibold headings, regular body text
-- **Scale**: Responsive sizing for all screen sizes
+## Architecture Notes
 
-## Getting Started
+- UI uses client-rendered pages and components under `app/` and `components/`.
+- Core data is loaded from `/api/data/bootstrap`.
+- Auth is cookie-based and handled in [`lib/server/auth.ts`](./lib/server/auth.ts).
+- Persistence is backed by Supabase through [`lib/server/supabaseRest.ts`](./lib/server/supabaseRest.ts).
+- AI features currently run through server routes in `app/api/`.
 
-### Prerequisites
+## Local Development
+
+### Requirements
+
 - Node.js 18+
-- npm or yarn
+- npm
+- Supabase project with the included SQL migration applied
+- OpenAI API key for AI features
 
-### Installation
+### Setup
 
-1. Clone the repository:
-```bash
-cd Ivy
-```
+1. Install dependencies:
 
-2. Install dependencies:
 ```bash
 npm install
 ```
 
-3. Run the development server:
+2. Copy the environment template:
+
+```bash
+cp .env.example .env.local
+```
+
+3. Fill in the required values in `.env.local`.
+
+4. Apply the Supabase migration in [`supabase/migrations/20260213170000_initial_auth_and_data.sql`](./supabase/migrations/20260213170000_initial_auth_and_data.sql).
+
+5. Start the app:
+
 ```bash
 npm run dev
 ```
 
-4. Open [http://localhost:3000](http://localhost:3000) in your browser
+6. Open `http://localhost:3000`.
 
-### Available Scripts
+## Environment Variables
 
-- `npm run dev` - Start development server
-- `npm run build` - Build for production
-- `npm start` - Start production server
-- `npm run lint` - Run ESLint
+See [`.env.example`](./.env.example) for the canonical list.
 
-## Usage
+Required:
 
-### Managing Courses
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `SUPABASE_SERVICE_ROLE_KEY`
 
-**Add a Course:**
-1. Click "Add New Course" button
-2. Fill in course code, name, color, total tasks, and due date
-3. Click "Add Course"
+Optional:
 
-**Edit a Course:**
-1. Hover over a course card
-2. Click the edit icon
-3. Modify details
-4. Click "Save Changes"
+- `OPENAI_API_KEY`
 
-**Delete a Course:**
-1. Hover over a course card
-2. Click the delete icon
-3. Confirm deletion
+If `OPENAI_API_KEY` is missing, parts of the career tooling fall back to deterministic non-AI responses. The main chat and study-generation flows require an API key.
 
-### Using the AI Assistant
+## Scripts
 
-1. Click the floating chat button in the bottom-right
-2. The chatbot interface expands from the bottom
-3. Switch between Chat, Flashcards, and Quizzes tabs
-4. Use quick action buttons or type a message
-5. Click the down arrow to minimize
+- `npm run dev` starts the local dev server
+- `npm run build` builds the production app
+- `npm start` serves the production build
+- `npm run lint` runs the TypeScript check
+- `npm run test:unit` placeholder today
+- `npm run test:integration` placeholder today
+- `npm run test:e2e` placeholder today
 
-## State Management
+## Current Gaps
 
-Currently using React's `useState` for local state management. The application maintains:
-- Course list with full CRUD operations
-- Dashboard statistics (auto-updated on course changes)
-- Modal state for create/edit operations
-- Chatbot visibility and tab selection
+These are real, known gaps in the repository today:
 
-## Future Enhancements
+- automated tests are not wired up yet
+- README-level deployment documentation is still minimal
+- AI key handling is server-owned by default rather than bring-your-own-key
+- some UI copy and branding are inconsistent with the underlying implementation
 
-- [ ] Backend integration with API
-- [ ] User authentication
-- [ ] Real AI chatbot integration (Claude API)
-- [ ] Flashcard generation functionality
-- [ ] Quiz generation functionality
-- [ ] Task management within courses
-- [ ] Calendar view for deadlines
-- [ ] File upload for lecture notes
-- [ ] Progress tracking and analytics
-- [ ] Mobile app version
+## Open Source Direction
 
-## Design Philosophy
-
-This project follows enterprise-grade design principles:
-- **Component Modularity**: Reusable, single-responsibility components
-- **Type Safety**: Full TypeScript coverage
-- **Accessibility**: Semantic HTML and keyboard navigation
-- **Performance**: Optimized rendering with React best practices
-- **Maintainability**: Clear folder structure and naming conventions
-- **User Experience**: Intuitive interactions with visual feedback
-
-## License
-
-This project is for educational purposes.
-
-## Acknowledgments
-
-- Design inspired by modern academic management platforms
-- Icons from Heroicons (via inline SVG)
-- Fonts from Google Fonts (Inter)
+The intended direction is to support a bring-your-own-key model so self-hosters can use their own API credentials rather than relying on a project-owned key. That work fits the current architecture and is a near-term improvement target.
