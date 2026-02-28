@@ -4,9 +4,11 @@ import { useState } from 'react';
 import { useEffect } from 'react';
 import Sidebar from '@/components/Sidebar';
 import IvyGradient from '@/components/IvyGradient';
+import OpenAIKeyStatus from '@/components/OpenAIKeyStatus';
 import { CoverLetterGenerationResult, Course } from '@/types';
 import { mockCourses } from '@/lib/mockData';
 import { fetchBootstrap, saveCareerAsset } from '@/lib/clientApi';
+import { getOpenAIKeyHeader } from '@/lib/openaiKey';
 
 const tonePresets = [
   'confident and concise',
@@ -43,9 +45,14 @@ export default function CoverLetterGenerator() {
     setIsGenerating(true);
 
     try {
+      const headers = new Headers({ 'Content-Type': 'application/json' });
+      for (const [key, value] of getOpenAIKeyHeader().entries()) {
+        headers.set(key, value);
+      }
+
       const response = await fetch('/api/cover-letter/generate', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({
           jobDescription,
           resumeSummary,
@@ -89,6 +96,8 @@ export default function CoverLetterGenerator() {
 
       <main className="ml-64 pb-24">
         <div className="max-w-7xl mx-auto px-8 py-10 space-y-8">
+          <OpenAIKeyStatus />
+
           <IvyGradient className="rounded-3xl p-8 text-white border border-primary-500/30">
             <h1 className="text-3xl font-bold !text-white">Cover Letter Generator</h1>
             <p className="text-white/90 mt-2">Generate a 300-400 word ATS-friendly draft from JD + resume summary.</p>

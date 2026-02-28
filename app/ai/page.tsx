@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import Sidebar from '@/components/Sidebar';
 import StudyAssistant from '@/components/StudyAssistant';
+import OpenAIKeyStatus from '@/components/OpenAIKeyStatus';
 import {
   Course,
   CourseColor,
@@ -191,6 +192,9 @@ export default function AIWorkspacePage() {
 
       <main className="ml-64 h-screen overflow-hidden">
         <div className="h-full w-full flex flex-col">
+          <div className="px-8 pt-8 pb-3 flex-shrink-0">
+            <OpenAIKeyStatus />
+          </div>
 
           {loadError && <p className="px-8 py-2 text-sm text-red-600 flex-shrink-0">{loadError}</p>}
 

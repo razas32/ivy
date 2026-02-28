@@ -8,6 +8,7 @@ import FlashcardView from './FlashcardView';
 import QuizView from './QuizView';
 import TypingIndicator from './TypingIndicator';
 import { CourseExtractionResult, Flashcard, QuizQuestion } from '@/types';
+import { getOpenAIKeyHeader } from '@/lib/openaiKey';
 
 type CreatedCourse = {
   id: string;
@@ -214,11 +215,14 @@ export default function StudyAssistant({
     payload: ChatPayload,
     options?: { onDelta?: (chunk: string) => void; signal?: AbortSignal }
   ): Promise<ChatResponse> => {
+    const headers = new Headers({ 'Content-Type': 'application/json' });
+    for (const [key, value] of getOpenAIKeyHeader().entries()) {
+      headers.set(key, value);
+    }
+
     const response = await fetch('/api/chat', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers,
       body: JSON.stringify(payload),
       signal: options?.signal,
     });

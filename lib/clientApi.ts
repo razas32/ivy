@@ -1,4 +1,5 @@
 import { Course, Deadline, Flashcard, QuizQuestion, Task } from '@/types';
+import { getOpenAIKeyHeader } from '@/lib/openaiKey';
 
 interface BootstrapResponse {
   courses: Course[];
@@ -15,12 +16,15 @@ interface ApiRequestOptions {
 
 async function apiRequest<T>(input: string, options?: ApiRequestOptions): Promise<T> {
   const init = options?.requestInit;
+  const headers = new Headers(init?.headers);
+  headers.set('Content-Type', 'application/json');
+  for (const [key, value] of getOpenAIKeyHeader().entries()) {
+    headers.set(key, value);
+  }
+
   const response = await fetch(input, {
     ...init,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(init?.headers || {}),
-    },
+    headers,
     cache: 'no-store',
   });
 

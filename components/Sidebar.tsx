@@ -5,6 +5,7 @@ import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { Course } from '@/types';
 import { useAuth } from './AuthProvider';
+import OpenAIKeySettings from './OpenAIKeySettings';
 
 interface SidebarProps {
   courses: Course[];
@@ -147,6 +148,9 @@ export default function Sidebar({ courses }: SidebarProps) {
       </nav>
 
       <div className="p-3 border-t border-gray-200/80">
+        <div className="mb-2">
+          <OpenAIKeySettings />
+        </div>
         {isAuthenticated ? (
           <button
             onClick={logout}

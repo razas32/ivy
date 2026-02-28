@@ -3,9 +3,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import Sidebar from '@/components/Sidebar';
 import IvyGradient from '@/components/IvyGradient';
+import OpenAIKeyStatus from '@/components/OpenAIKeyStatus';
 import { Course, ResumeAnalysisReport } from '@/types';
 import { mockCourses } from '@/lib/mockData';
 import { fetchBootstrap, saveCareerAsset } from '@/lib/clientApi';
+import { getOpenAIKeyHeader } from '@/lib/openaiKey';
 
 type AnalysisStep = 'idle' | 'uploading' | 'parsing' | 'scoring' | 'recommendations' | 'done';
 
@@ -52,11 +54,13 @@ export default function ResumeAnalyzer() {
       const formData = new FormData();
       formData.set('file', file);
       formData.set('jobDescription', jobDescription);
+      const headers = getOpenAIKeyHeader();
 
       setAnalysisStep('parsing');
 
       const response = await fetch('/api/resume/analyze', {
         method: 'POST',
+        headers,
         body: formData,
       });
 
@@ -108,6 +112,8 @@ export default function ResumeAnalyzer() {
 
       <main className="ml-64 pb-20">
         <div className="max-w-7xl mx-auto px-8 py-10 space-y-8">
+          <OpenAIKeyStatus />
+
           <IvyGradient className="rounded-3xl p-8 text-white border border-primary-500/30">
             <h1 className="text-3xl font-bold !text-white">Resume Analyzer</h1>
             <p className="text-white/90 mt-2">Upload PDF + job description for ATS match score and specific edits.</p>
