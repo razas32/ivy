@@ -5,7 +5,7 @@ import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { Course } from '@/types';
 import { useAuth } from './AuthProvider';
-import OpenAIKeySettings from './OpenAIKeySettings';
+import { openOpenAISettings } from './OpenAIKeyStatus';
 
 interface SidebarProps {
   courses: Course[];
@@ -148,9 +148,17 @@ export default function Sidebar({ courses }: SidebarProps) {
       </nav>
 
       <div className="p-3 border-t border-gray-200/80">
-        <div className="mb-2">
-          <OpenAIKeySettings />
-        </div>
+        <button
+          type="button"
+          onClick={openOpenAISettings}
+          className={`${navItemBase} text-gray-700 hover:bg-gray-100/80`}
+          data-auth-exempt="true"
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4v-3l5.257-5.257A6 6 0 1121 9z" />
+          </svg>
+          <span className="text-sm font-medium">AI Key Settings</span>
+        </button>
         {isAuthenticated ? (
           <button
             onClick={logout}

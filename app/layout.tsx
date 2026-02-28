@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { AuthProvider } from "@/components/AuthProvider";
+import OpenAIKeySettings from "@/components/OpenAIKeySettings";
 
 export const metadata: Metadata = {
   title: "Ivy - Study Assistant",
@@ -23,7 +24,10 @@ export default function RootLayout({
         />
       </head>
       <body>
-        <AuthProvider>{children}</AuthProvider>
+        <AuthProvider>
+          {children}
+          <OpenAIKeySettings />
+        </AuthProvider>
       </body>
     </html>
   );
