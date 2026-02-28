@@ -65,7 +65,7 @@ export default function ChatBot() {
                 </div>
                 <div>
                   <h3 className="font-semibold text-gray-900">AI Study Assistant</h3>
-                  <p className="text-xs text-gray-500">Powered by Claude</p>
+                  <p className="text-xs text-gray-500">Powered by OpenAI</p>
                 </div>
               </div>
               <button
