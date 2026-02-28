@@ -2,10 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
 import { CourseExtractionResult, Flashcard, QuizQuestion } from '@/types';
 import { requireAuthenticatedUser } from '@/lib/server/auth';
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+import { createOpenAIClientForRequest } from '@/lib/server/openai';
 
 const SYSTEM_PROMPT = `You are Ivy, an AI study assistant. Extract course structure, deadlines, and tasks from the provided conversation context and document text.
 
@@ -210,6 +207,14 @@ export async function POST(req: NextRequest) {
   if (errorResponse) return errorResponse;
 
   try {
+    const openai = createOpenAIClientForRequest(req);
+    if (!openai) {
+      return NextResponse.json(
+        { error: 'No OpenAI API key is configured. Add your own key in settings or set OPENAI_API_KEY on the server.' },
+        { status: 400 }
+      );
+    }
+
     const { messages, fileContent, generationType } = await req.json();
     const mode: 'chat' | 'course' | 'flashcards' | 'quiz' =
       generationType === 'course' || generationType === 'flashcards' || generationType === 'quiz'
@@ -250,7 +255,7 @@ export async function POST(req: NextRequest) {
 
     const responseFormat = getResponseFormat(mode);
     if (mode === 'chat') {
-      return streamChatCompletion(openaiMessages);
+      return streamChatCompletion(openai, openaiMessages);
     }
 
     // Call OpenAI API with JSON schema response when needed
@@ -317,6 +322,7 @@ export async function POST(req: NextRequest) {
 }
 
 function streamChatCompletion(
+  openai: OpenAI,
   openaiMessages: OpenAI.Chat.Completions.ChatCompletionMessageParam[]
 ) {
   const encoder = new TextEncoder();

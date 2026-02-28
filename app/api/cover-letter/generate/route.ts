@@ -1,10 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import OpenAI from 'openai';
 import { checkRateLimit } from '@/lib/rateLimiter';
 import { stripHtml } from '@/lib/textUtils';
 import { requireAuthenticatedUser } from '@/lib/server/auth';
-
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+import { createOpenAIClientForRequest } from '@/lib/server/openai';
 
 interface Payload {
   jobDescription: string;
@@ -89,7 +87,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Please remove profanity from your inputs.' }, { status: 400 });
     }
 
-    if (!process.env.OPENAI_API_KEY) {
+    const openai = createOpenAIClientForRequest(req);
+    if (!openai) {
       return NextResponse.json(fallbackDraft(jobDescription, resumeSummary));
     }
 

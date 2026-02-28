@@ -8,6 +8,7 @@ export const STORAGE_KEYS = {
   quizzes: `${STORAGE_PREFIX}:quizzes`,
   generatedAssets: `${STORAGE_PREFIX}:generated-assets`,
   careerReports: `${STORAGE_PREFIX}:career-reports`,
+  openaiApiKey: `${STORAGE_PREFIX}:openai-api-key`,
 };
 
 const isBrowser = () => typeof window !== 'undefined';

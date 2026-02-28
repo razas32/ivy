@@ -1,20 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server';
-import OpenAI from 'openai';
 import { checkRateLimit } from '@/lib/rateLimiter';
 import { extractTextFromUpload } from '@/lib/fileTextExtraction';
 import { runResumeKeywordAnalysis } from '@/lib/resumeAnalyzer';
 import { stripHtml } from '@/lib/textUtils';
 import { requireAuthenticatedUser } from '@/lib/server/auth';
-
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+import { createOpenAIClientForRequest, getOpenAIKeySource, hasAnyOpenAIKey } from '@/lib/server/openai';
 
 function getClientKey(req: NextRequest) {
   const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim();
   return ip || 'anon';
 }
 
-async function getRecommendations(jobDescription: string, resumeText: string, missingKeywords: string[]) {
-  if (!process.env.OPENAI_API_KEY) {
+async function getRecommendations(
+  req: NextRequest,
+  jobDescription: string,
+  resumeText: string,
+  missingKeywords: string[]
+) {
+  const openai = createOpenAIClientForRequest(req);
+  if (!openai) {
     return [
       'Add a summary line aligned to the role scope and top requirements.',
       `Include evidence for missing keywords: ${missingKeywords.slice(0, 3).join(', ') || 'role-specific tools'}.`,
@@ -91,7 +95,7 @@ export async function POST(req: NextRequest) {
     }
 
     const analysis = runResumeKeywordAnalysis(resumeText, jobDescription);
-    const recommendations = await getRecommendations(jobDescription, resumeText, analysis.missingKeywords);
+    const recommendations = await getRecommendations(req, jobDescription, resumeText, analysis.missingKeywords);
 
     const elapsedMs = Date.now() - startedAt;
     console.info('resume_analyze_complete', {
@@ -111,7 +115,8 @@ export async function POST(req: NextRequest) {
       extractedResumePreview: resumeText.slice(0, 1000),
       telemetry: {
         elapsedMs,
-        model: process.env.OPENAI_API_KEY ? 'gpt-4o-mini' : 'fallback',
+        model: hasAnyOpenAIKey(req) ? 'gpt-4o-mini' : 'fallback',
+        keySource: getOpenAIKeySource(req),
       },
     });
   } catch (error) {
