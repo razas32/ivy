@@ -33,7 +33,7 @@ export default function Sidebar({ courses }: SidebarProps) {
   return (
     <aside className="w-64 h-screen bg-white/95 border-r border-gray-200/90 backdrop-blur-sm flex flex-col fixed left-0 top-0">
       <div className="p-5 border-b border-gray-200/80">
-        <div className="flex justify-start pl-3">
+        <div className="flex justify-center">
           <Image
             src="/ivy_logo.png"
             alt="Ivy Logo"
