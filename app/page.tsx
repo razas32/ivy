@@ -8,6 +8,7 @@ import GradientStatsCard from '@/components/GradientStatsCard';
 import CourseCard from '@/components/CourseCard';
 import CourseModal from '@/components/CourseModal';
 import AppNotice from '@/components/AppNotice';
+import ConfirmationModal from '@/components/ConfirmationModal';
 import { Course, Deadline, Task } from '@/types';
 import { mockCourses, mockDeadlines, mockTasks } from '@/lib/mockData';
 import { generateId } from '@/lib/utils';
@@ -26,6 +27,7 @@ export default function Dashboard() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState<'create' | 'edit'>('create');
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
+  const [coursePendingDeletion, setCoursePendingDeletion] = useState<Course | null>(null);
   const [isHydrated, setIsHydrated] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -112,17 +114,23 @@ export default function Dashboard() {
     setIsModalOpen(true);
   };
 
-  const handleDeleteCourse = async (id: string) => {
-    if (confirm('Are you sure you want to delete this course?')) {
-      try {
-        await deleteCourse(id);
-        setCourses(courses.filter(c => c.id !== id));
-        setTasks(tasks.filter(task => task.courseId !== id));
-        setDeadlines(deadlines.filter(deadline => deadline.courseId !== id));
-      } catch (error) {
-        const message = error instanceof Error ? error.message : 'Action failed.';
-        setLoadError(message);
-      }
+  const handleDeleteCourse = (id: string) => {
+    const course = courses.find((item) => item.id === id) || null;
+    setCoursePendingDeletion(course);
+  };
+
+  const confirmDeleteCourse = async () => {
+    if (!coursePendingDeletion) return;
+
+    try {
+      await deleteCourse(coursePendingDeletion.id);
+      setCourses(courses.filter(c => c.id !== coursePendingDeletion.id));
+      setTasks(tasks.filter(task => task.courseId !== coursePendingDeletion.id));
+      setDeadlines(deadlines.filter(deadline => deadline.courseId !== coursePendingDeletion.id));
+      setCoursePendingDeletion(null);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Action failed.';
+      setLoadError(message);
     }
   };
 
@@ -387,6 +395,20 @@ export default function Dashboard() {
         onSave={handleSaveCourse}
         course={selectedCourse}
         mode={modalMode}
+      />
+      <ConfirmationModal
+        isOpen={Boolean(coursePendingDeletion)}
+        title="Delete course?"
+        description={
+          coursePendingDeletion
+            ? `This will remove ${coursePendingDeletion.code} and its related tasks and deadlines.`
+            : ''
+        }
+        confirmLabel="Delete Course"
+        cancelLabel="Keep Course"
+        tone="danger"
+        onConfirm={confirmDeleteCourse}
+        onCancel={() => setCoursePendingDeletion(null)}
       />
     </div>
   );
