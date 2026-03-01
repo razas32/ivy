@@ -222,8 +222,6 @@ export async function POST(req: NextRequest) {
         : 'chat';
     const safeMessages = Array.isArray(messages) ? messages : [];
 
-    console.log('Received request:', { messagesCount: safeMessages.length, hasFileContent: !!fileContent, mode });
-
     // Prepare messages for OpenAI
     const openaiMessages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
       { role: 'system', content: getSystemPrompt(mode) },
@@ -251,8 +249,6 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    console.log('Calling OpenAI API with', openaiMessages.length, 'messages for mode', mode);
-
     const responseFormat = getResponseFormat(mode);
     if (mode === 'chat') {
       return streamChatCompletion(openai, openaiMessages);
@@ -266,9 +262,6 @@ export async function POST(req: NextRequest) {
       max_tokens: 4000,
       ...(responseFormat ? { response_format: responseFormat } : {}),
     });
-
-    console.log('OpenAI API response received');
-
     const rawContent = completion.choices[0].message.content;
     let structuredData: CourseExtractionResult | null = null;
     let flashcards: Flashcard[] | undefined;
@@ -307,12 +300,11 @@ export async function POST(req: NextRequest) {
       quizQuestions,
     });
   } catch (error: any) {
-    console.error('OpenAI API error details:', {
-      message: error.message,
-      status: error.status,
-      type: error.type,
-      code: error.code,
-      fullError: error
+    console.error('chat_route_error', {
+      message: error?.message,
+      status: error?.status,
+      type: error?.type,
+      code: error?.code,
     });
     return NextResponse.json(
       { error: error.message || 'Failed to process request' },
