@@ -1,25 +1,24 @@
 import { NextRequest } from 'next/server';
 import OpenAI from 'openai';
 import { OPENAI_KEY_HEADER } from '@/lib/openaiKey';
+import {
+  getOpenAIKeySourceFromKeys,
+  resolveOpenAIKey,
+  sanitizeApiKey,
+} from '@/lib/core/openaiKeyResolver';
 
 const SERVER_OPENAI_KEY = process.env.OPENAI_API_KEY?.trim() || '';
-
-function sanitizeApiKey(value: string | null) {
-  if (!value) return '';
-  return value.trim().replace(/[\r\n]/g, '');
-}
 
 export function getRequestOpenAIKey(req: NextRequest) {
   return sanitizeApiKey(req.headers.get(OPENAI_KEY_HEADER));
 }
 
 export function getResolvedOpenAIKey(req: NextRequest) {
-  const requestKey = getRequestOpenAIKey(req);
-  return requestKey || SERVER_OPENAI_KEY;
+  return resolveOpenAIKey(req.headers.get(OPENAI_KEY_HEADER), SERVER_OPENAI_KEY);
 }
 
 export function getOpenAIKeySource(req: NextRequest) {
-  return getRequestOpenAIKey(req) ? 'user' : SERVER_OPENAI_KEY ? 'server' : 'none';
+  return getOpenAIKeySourceFromKeys(req.headers.get(OPENAI_KEY_HEADER), SERVER_OPENAI_KEY);
 }
 
 export function createOpenAIClientForRequest(req: NextRequest) {
