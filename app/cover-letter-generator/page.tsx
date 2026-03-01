@@ -5,6 +5,7 @@ import { useEffect } from 'react';
 import Sidebar from '@/components/Sidebar';
 import IvyGradient from '@/components/IvyGradient';
 import OpenAIKeyStatus from '@/components/OpenAIKeyStatus';
+import AppNotice from '@/components/AppNotice';
 import { CoverLetterGenerationResult, Course } from '@/types';
 import { mockCourses } from '@/lib/mockData';
 import { fetchBootstrap, saveCareerAsset } from '@/lib/clientApi';
@@ -151,16 +152,16 @@ export default function CoverLetterGenerator() {
               <button onClick={copyDraft} className="px-3 py-2 border border-gray-300 rounded-lg text-sm">Copy</button>
             </div>
 
-            {error && <div className="p-3 border border-red-200 bg-red-50 text-red-700 rounded-lg text-sm">{error}</div>}
+            {error && <AppNotice tone="error">{error}</AppNotice>}
 
             {!result && !isGenerating && !error && (
               <p className="text-sm text-gray-600">Generate a draft to view outline and keyword coverage.</p>
             )}
 
             {isGenerating && (
-              <div className="p-3 border border-primary-200 bg-primary-50 text-primary-700 rounded-lg text-sm">
+              <AppNotice tone="info">
                 Drafting cover letter and alignment outline...
-              </div>
+              </AppNotice>
             )}
 
             {result && (

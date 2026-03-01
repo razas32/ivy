@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import Sidebar from '@/components/Sidebar';
 import StudyAssistant from '@/components/StudyAssistant';
 import OpenAIKeyStatus from '@/components/OpenAIKeyStatus';
+import AppNotice from '@/components/AppNotice';
 import {
   Course,
   CourseColor,
@@ -196,7 +197,11 @@ export default function AIWorkspacePage() {
             <OpenAIKeyStatus />
           </div>
 
-          {loadError && <p className="px-8 py-2 text-sm text-red-600 flex-shrink-0">{loadError}</p>}
+          {loadError && (
+            <div className="px-8 py-2 flex-shrink-0">
+              <AppNotice tone="error">{loadError}</AppNotice>
+            </div>
+          )}
 
           <div className="flex-1 min-h-0">
             <StudyAssistant

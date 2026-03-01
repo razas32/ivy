@@ -7,6 +7,7 @@ import PomodoroCard from '@/components/PomodoroCard';
 import GradientStatsCard from '@/components/GradientStatsCard';
 import CourseCard from '@/components/CourseCard';
 import CourseModal from '@/components/CourseModal';
+import AppNotice from '@/components/AppNotice';
 import { Course, Deadline, Task } from '@/types';
 import { mockCourses, mockDeadlines, mockTasks } from '@/lib/mockData';
 import { generateId } from '@/lib/utils';
@@ -224,7 +225,7 @@ export default function Dashboard() {
               </div>
             </div>
             {loadError && (
-              <p className="mt-3 text-sm text-red-600">{loadError}</p>
+              <AppNotice tone="error" className="mt-3">{loadError}</AppNotice>
             )}
           </div>
 

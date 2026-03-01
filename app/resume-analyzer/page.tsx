@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import Sidebar from '@/components/Sidebar';
 import IvyGradient from '@/components/IvyGradient';
 import OpenAIKeyStatus from '@/components/OpenAIKeyStatus';
+import AppNotice from '@/components/AppNotice';
 import { Course, ResumeAnalysisReport } from '@/types';
 import { mockCourses } from '@/lib/mockData';
 import { fetchBootstrap, saveCareerAsset } from '@/lib/clientApi';
@@ -174,13 +175,13 @@ export default function ResumeAnalyzer() {
               </div>
 
               {isAnalyzing && (
-                <div className="p-4 rounded-lg border border-primary-200 bg-primary-50 text-primary-700 text-sm font-medium">
+                <AppNotice tone="info" className="font-medium">
                   {stepLabel}
-                </div>
+                </AppNotice>
               )}
 
               {error && (
-                <div className="p-4 rounded-lg border border-red-200 bg-red-50 text-red-700 text-sm">{error}</div>
+                <AppNotice tone="error">{error}</AppNotice>
               )}
 
               {!report && !isAnalyzing && !error && (
