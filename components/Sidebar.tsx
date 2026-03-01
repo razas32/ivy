@@ -16,7 +16,7 @@ const navItemBase =
 
 export default function Sidebar({ courses }: SidebarProps) {
   const pathname = usePathname();
-  const { isAuthenticated, openAuthModal, logout } = useAuth();
+  const { isAuthenticated, openAuthModal, logout, user } = useAuth();
 
   const getCourseColorClass = (color: string) => {
     const colorMap: Record<string, string> = {
@@ -148,6 +148,15 @@ export default function Sidebar({ courses }: SidebarProps) {
       </nav>
 
       <div className="p-3 border-t border-gray-200/80">
+        <div className="mb-3 rounded-xl border border-gray-200 bg-surface-50 px-3 py-2.5">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-400">Account</p>
+          <p className="mt-1 text-sm font-medium text-gray-900">
+            {isAuthenticated ? user?.username || 'Signed in' : 'Guest mode'}
+          </p>
+          <p className="mt-0.5 text-xs text-gray-600">
+            {isAuthenticated ? 'Authenticated workspace access is enabled.' : 'Sign in to persist and sync changes.'}
+          </p>
+        </div>
         <button
           type="button"
           onClick={openOpenAISettings}
