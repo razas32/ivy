@@ -12,18 +12,27 @@
     "verify": "npm run lint && npm run verify:byok",
     "test:unit": "node --experimental-strip-types --test tests/*.test.mjs",
     "test:integration": "echo \"No integration tests configured yet\"",
-    "test:e2e": "echo \"No e2e tests configured yet\""
+    "test:e2e": "echo \"No e2e tests configured yet\"",
+    "video:screenshots": "node scripts/capture-screenshots.mjs",
+    "video:voiceovers": "node scripts/generate-voiceovers.mjs",
+    "video:all": "npm run video:screenshots && npm run video:voiceovers",
+    "video:start": "npx remotion studio",
+    "video:render": "npx remotion render src/Root.tsx IvyCapstone output.mp4"
   },
   "dependencies": {
     "@anthropic-ai/claude-code": "^2.0.32",
     "@tailwindcss/postcss": "^4.1.16",
     "next": "^16.0.1",
-    "openai": "^6.8.0",
+    "openai": "^6.33.0",
     "pdfjs-dist": "^5.4.394",
+    "puppeteer": "^24.40.0",
     "react": "^19.2.0",
-    "react-dom": "^19.2.0"
+    "react-dom": "^19.2.0",
+    "remotion": "^4.0.441",
+    "zod": "4.3.6"
   },
   "devDependencies": {
+    "@remotion/cli": "^4.0.441",
     "@types/node": "^24.10.0",
     "@types/react": "^19.2.2",
     "@types/react-dom": "^19.2.2",
