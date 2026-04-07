@@ -13,6 +13,16 @@ export default function FlashcardView({ flashcards, isGenerating, onClear }: Fla
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isFlipped, setIsFlipped] = useState(false);
 
+  const showPreviousCard = () => {
+    setCurrentIndex(Math.max(0, currentIndex - 1));
+    setIsFlipped(false);
+  };
+
+  const showNextCard = () => {
+    setCurrentIndex(Math.min(flashcards.length - 1, currentIndex + 1));
+    setIsFlipped(false);
+  };
+
   useEffect(() => {
     setCurrentIndex(0);
     setIsFlipped(false);
@@ -62,30 +72,42 @@ export default function FlashcardView({ flashcards, isGenerating, onClear }: Fla
         )}
       </div>
 
-      <div
+      <button
+        type="button"
         onClick={() => setIsFlipped(!isFlipped)}
-        className="w-full max-w-2xl h-64 cursor-pointer perspective-1000"
+        className="flashcard-scene w-full max-w-2xl h-64 cursor-pointer text-left"
+        aria-label={isFlipped ? 'Show question side of flashcard' : 'Show answer side of flashcard'}
       >
-        <div className={`relative w-full h-full transition-transform duration-500 transform-style-3d ${isFlipped ? 'rotate-y-180' : ''}`}>
-          <div className="absolute inset-0 bg-white border-2 border-gray-200 rounded-xl p-8 flex items-center justify-center backface-hidden shadow-lg">
-            <p className="text-lg text-center text-gray-900">{currentCard.front}</p>
+        <div className={`flashcard-inner ${isFlipped ? 'is-flipped' : ''}`}>
+          <div className="flashcard-face bg-white border-2 border-gray-200 rounded-xl p-8 flex items-center justify-center shadow-lg">
+            <div className="space-y-3">
+              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-gray-500 text-center">Question</p>
+              <p className="text-lg text-center text-gray-900">{currentCard.front}</p>
+            </div>
           </div>
-          <div className="absolute inset-0 bg-primary-50 border-2 border-primary-200 rounded-xl p-8 flex items-center justify-center rotate-y-180 backface-hidden shadow-lg">
-            <p className="text-lg text-center text-gray-900">{currentCard.back}</p>
+          <div className="flashcard-face flashcard-face-back bg-primary-50 border-2 border-primary-200 rounded-xl p-8 flex items-center justify-center shadow-lg">
+            <div className="space-y-3">
+              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-primary-700 text-center">Answer</p>
+              <p className="text-lg text-center text-gray-900">{currentCard.back}</p>
+            </div>
           </div>
         </div>
-      </div>
+      </button>
+
+      <p className="mt-3 text-sm text-gray-600">Tap the card to flip between the question and answer.</p>
 
       <div className="mt-6 flex items-center gap-4">
         <button
-          onClick={() => setCurrentIndex(Math.max(0, currentIndex - 1))}
+          type="button"
+          onClick={showPreviousCard}
           disabled={currentIndex === 0}
           className="btn btn-secondary disabled:opacity-50"
         >
           Previous
         </button>
         <button
-          onClick={() => setCurrentIndex(Math.min(flashcards.length - 1, currentIndex + 1))}
+          type="button"
+          onClick={showNextCard}
           disabled={currentIndex === flashcards.length - 1}
           className="btn btn-secondary disabled:opacity-50"
         >

@@ -136,7 +136,8 @@ const COURSE_EXTRACTION_SCHEMA = {
 const FLASHCARD_PROMPT = `You are Ivy, an AI study assistant. Given lecture or study material, extract concise flashcards.
 
 - Front: short prompt/question.
-- Back: concise answer with key details.
+- Back: concise answer with key details supported by the material.
+- If the material does not contain enough information to answer confidently, skip that flashcard.
 - Avoid markdown, bullets, and citations. Keep each side under 240 characters.`;
 
 const FLASHCARD_SCHEMA = {
