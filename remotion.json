@@ -1,0 +1,6 @@
+{
+  "crf": 18,
+  "timeout": 120000,
+  "concurrency": 5,
+  "publicDir": "./public"
+}
